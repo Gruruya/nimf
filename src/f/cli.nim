@@ -19,98 +19,56 @@
 
 import sugar
 
-import ./find, pkg/[cligen, malebolgia], std/[terminal, exitprocs, os, paths]
-from std/strutils import endsWith, removePrefix
-from std/sugar import dup
+import ./paths, pkg/cligen, std/terminal
+from std/os import isAbsolute, fileExists, dirExists
+from std/strutils import endsWith
 export cligen
 
-type CliParams = object
-  input: seq[string]
-  color = true
-
-proc display(p: CliParams, path: string, patterns: seq[string], found: seq[int], kind: PathComponent) =
-  if p.color:
-    let parent = path[0 ..< path.len - path.lastPathPart.len]
-    if kind == pcDir or parent != "./":
-      stdout.setForegroundColor(fgBlue)
-      stdout.setStyle({styleBright})
-      stdout.write parent.dup(removePrefix("./"))
-      if kind != pcDir:
-        stdout.resetAttributes()
-    var start = parent.len
-    for i in 0..found.high:
-      let colorStart = found[i] + parent.len
-      let colorEnd = colorStart + patterns[i].high
-      stdout.write path[start ..< colorStart]
-      stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
-      if kind == pcDir:
-        stdout.setForegroundColor(fgBlue)
-        stdout.setStyle({styleBright})
-      start = colorEnd + 1
-    if start != path.len:
-      stdout.write path[start..path.high]
-    if kind == pcDir:
-      stdout.write "/"
-    stdout.write '\n'
-  else:
-    echo path
-
-proc findDirRec(p: CliParams, m: MasterHandle, dir: string, patterns: seq[string]) {.gcsafe.} =
-  ## Modified from ./paths to write directly to stdout rather than using state
-  for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
-    case descendent.kind
-    of pcFile:
-      let found = descendent.path.lastPathPart.find(patterns)
-      if found.len > 0:
-        p.display(dir / descendent.path, patterns, found, pcFile)
-    of pcDir:
-      let found = descendent.path.lastPathPart.find(patterns)
-      if found.len > 0:
-        p.display(dir / descendent.path, patterns, found, pcDir)
-      if isAbsolute(dir):
-        m.spawn p.findDirRec(m, descendent.path, patterns)
-      else:
-        m.spawn p.findDirRec(m, dir / descendent.path, patterns)
-    else:
-      discard
-
-proc find(paths: seq[Path], patterns: seq[string], p: CliParams) =
-  ## Modified from ./paths to write directly to stdout rather than using state
-  var m = createMaster()
-  m.awaitAll:
-    for i, path in paths:
-      let info = getFileInfo(cast[string](path))
-      case info.kind
-      of pcFile:
-        let found = path.string.lastPathPart.find(patterns)
-        if found.len > 0:
-          p.display(path.string, patterns, found, pcFile)
-      of pcDir:
-        m.spawn p.findDirRec(getHandle m, path.string, patterns)
-      of pcLinkToFile:
-        discard
-      else:
-        discard
-
-proc cliFind*() =
-  exitprocs.addExitProc(resetAttributes)
-  var p = initFromCL(CliParams(), positional = "input")
+proc cliFind*(color = true, input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
-  if p.input.len >= 1:
-    if dirExists(p.input[0]):
-      paths.add Path(p.input[0])
+  if input.len >= 1:
+    if dirExists(input[0]):
+      paths.add Path(input[0])
     else:
-      patterns.add p.input[0].split(' ')
-    for i in 1..p.input.high:
-      let arg = p.input[i] 
+      patterns.add input[0].split(' ')
+    for i in 1..input.high:
+      let arg = input[i] 
       if (dirExists(arg) or fileExists(arg)) and arg notin cast[seq[string]](paths):
         paths.add Path(arg) # Make it different based on if it's in the current directory?
       else:
         patterns &= arg.split(' ')
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
-  paths.find(patterns, p)
+
+  let findings = find(paths, patterns)
+  for found in findings:
+    let path = found[0].string
+    if color:
+      let parent = path[0 ..< path.len - path.lastPathPart.len]
+      stdout.setForegroundColor(fgBlue)
+      stdout.setStyle({styleBright})
+      if parent != "./":
+        stdout.write parent
+      if found[2] != pcDir:
+        stdout.resetAttributes()
+      var start = parent.len
+      for i in 0..found[1].high:
+        let colorStart = found[1][i] + parent.len
+        let colorEnd = colorStart + patterns[i].high
+        stdout.write path[start ..< colorStart]
+        stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
+        start = colorEnd + 1
+      if start != path.len:
+        if found[2] == pcDir:
+          stdout.styledWrite styleBright, fgBlue, path[start..path.high]
+        else:
+          stdout.write path[start..path.high]
+      if found[2] == pcDir:
+        stdout.styledWrite styleBright, fgBlue, "/"
+      stdout.write '\n'
+    else:
+      echo path
 
 when isMainModule:
-  cliFind()
+  dispatch(cliFind)
