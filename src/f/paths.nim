@@ -28,8 +28,9 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
-proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.gcsafe.} =
-  for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
+proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcsafe.} =
+  let absolute = isAbsolute(dir)
+  for descendent in dir.string.walkDir(relative = not absolute):
     case descendent.kind
     of pcFile:
       let found = descendent.path.lastPathPart.find(patterns)
@@ -45,7 +46,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.gcsafe.} =
          acquire(findings.lock)
          findings.found.add (dir / Path(descendent.path), found, pcDir)
          release(findings.lock)
-      if isAbsolute(dir):
+      if absolute:
         m.spawn findDirRec(m, Path(descendent.path), patterns)
       else:
         m.spawn findDirRec(m, dir / Path(descendent.path), patterns)

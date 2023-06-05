@@ -17,9 +17,9 @@
 
 ## CLI for finding files
 
-import ./paths, pkg/cligen, std/[terminal, paths]
-from std/os import isAbsolute, fileExists, dirExists
-from std/strutils import startsWith, endsWith
+import ./paths, pkg/[cligen, malebolgia], std/[terminal, paths, osproc]
+from std/os import fileExists, dirExists, quoteShell, execShellCmd
+from std/strutils import startsWith, endsWith, replace
 from std/sequtils import anyIt
 export cligen
 
@@ -29,14 +29,14 @@ proc isChildOf(path, potParent: string): bool =
     if aPotParent == parent: return true
   result = false
 
-proc cliFind*(color = true, input: seq[string]): int =
+proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
   if input.len >= 1:
     for i in 0..input.high:
       let arg = input[i]
       if (dirExists(arg) and (arg.endsWith('/') or not anyIt(cast[seq[string]](paths), arg.isChildOf(it)))) or ((arg.startsWith("./") or absolutePath(Path(arg.parentDir)) != getCurrentDir()) and fileExists(arg)):
-        paths.add Path(arg) # Allow duplicate directories if input ends with /
+        paths.add Path(arg) # Glob all directories/allow shorthand like ./m for ./man
       else:
         patterns &= arg.split(' ')
   if patterns.len == 0: patterns = @[""]
@@ -48,7 +48,29 @@ proc cliFind*(color = true, input: seq[string]): int =
   let findings = find(paths, patterns)
   for found in findings:
     let path = found[0].string
-    if color:
+    if exec.len > 0:
+      var outputs = newSeq[int](exec.len)
+      var m = createMaster()
+      m.awaitAll:
+        for i, cmd in exec:
+          var cmd = cmd
+          var curlyFound = false
+          block replaceCurly:
+            var i = 0
+            while true:
+              if cmd[i] == '{' and cmd[i + 1] == '}':
+                if cmd.len > i + 1:
+                  cmd = cmd[0..<i] & path & cmd[i + 2..^1]
+                else: cmd = cmd[0..<i] & path
+                curlyFound = true
+                inc i, 2
+              else:
+                inc i
+              if i > cmd.len - "{}".len: break
+          if not curlyFound: cmd = cmd & ' ' & path.quoteShell
+          m.spawn execShellCmd(cmd) -> outputs[i]
+
+    elif color:
       let parent = path[0 ..< path.len - path.lastPathPart.len]
       if found[2] == pcDir or parent != "./":
         stdout.setForegroundColor(fgBlue)
@@ -75,4 +97,4 @@ proc cliFind*(color = true, input: seq[string]): int =
       echo path
 
 when isMainModule:
-  dispatch(cliFind)
+  dispatch(cliFind, short = {"exec": 'x'})
