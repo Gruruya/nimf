@@ -33,6 +33,16 @@ proc stripExtension(path: Path): Path =
   let (dir, name, _) = path.splitFile
   dir / name
 
+template mapIt[T](collection: openArray[T], op: untyped): seq =
+  type OutType = typeof((block:
+    var i{.inject.}: int;
+    var it{.inject.}: typeof(items(collection), typeOfIter);
+    op), typeOfProc)
+  var result = newSeqOfCap[OutType](collection.len)
+  for i {.inject.}, it {.inject.} in collection:
+    result.add op
+  result
+
 proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
@@ -55,16 +65,43 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
     var m = createMaster()
     proc run(cmd: string) = discard execShellCmd(cmd)
     m.awaitAll:
-      for i, inCmd in exec:
-        for found in findings:
-          let path = found.path
-          var cmd = inCmd.multiReplace(("{}", path.string.quoteShell),
-                                       ("{/}", path.lastPathPart.string),
-                                       ("{//}", path.parentDir.string),
-                                       ("{/.}", if found.kind == pcDir: path.lastPathPart.string else: path.splitFile[1].string),
-                                       ("{.}", path.stripExtension.string))
-          if cmd == inCmd: cmd = inCmd & ' ' & path.string.quoteShell()
-          m.spawn run cmd
+      let
+        paths = mapIt(findings, it.path.string.quoteShell)
+        filenames = mapIt(findings, it.path.lastPathPart.string)
+        parentDirs = mapIt(findings, it.path.parentDir.string)
+        noExtFilenames = mapIt(findings, if it.kind == pcDir: filenames[i] else: it.path.splitFile[1].string)
+        noExtPaths = mapIt(findings, it.path.stripExtension.string)
+      template runCmd(): untyped =
+        for inCmd in exec:
+          for i in findings.low..findings.high:
+            var cmd = inCmd.multiReplace(("{}", paths[i]),
+                                         ("{/}", filenames[i]),
+                                         ("{//}", parentDirs[i]),
+                                         ("{/.}", noExtFilenames[i]),
+                                         ("{.}", noExtPaths[i]))
+            if cmd == inCmd: cmd = inCmd & ' ' & paths[i]
+            m.spawn run cmd
+      if not anyIt(exec, it.endsWith '+'):
+        runCmd()
+      else:
+        let
+          pathsString = paths.join(" ")
+          filenamesString = filenames.join(" ")
+          parentDirsString = parentDirs.join(" ")
+          noExtFilenamesString = noExtFilenames.join(" ")
+          noExtPathsString = noExtPaths.join(" ")
+        for inCmd in exec:
+          if inCmd.endsWith '+': 
+            let inCmd = inCmd[0..^2]
+            var cmd = inCmd.multiReplace(("{}", pathsString),
+                                         ("{/}", filenamesString),
+                                         ("{//}", parentDirsString),
+                                         ("{/.}", noExtFilenamesString),
+                                         ("{.}", noExtPathsString))
+            if cmd == inCmd: cmd = inCmd & ' ' & pathsString
+            m.spawn run cmd
+          else:
+            runCmd()
   else:
     for found in findings:
       let path = found.path.string
