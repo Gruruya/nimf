@@ -18,12 +18,15 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks], pkg/malebolgia
-from std/strutils import startsWith
 export Path, parentDir, lastPathPart, PathComponent
 
 type
+  Found* = object
+    path*: Path
+    kind*: PathComponent
+    matches*: seq[int]
   Findings = object
-    found: seq[(Path, seq[int], PathComponent)]
+    found: seq[Found]
     lock: Lock
 
 var findings = Findings()
@@ -41,7 +44,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
           else: dir / Path(descendent.path)
         {.gcsafe.}:
           acquire(findings.lock)
-          findings.found.add (path, found, pcFile)
+          findings.found.add Found(path: path, kind: pcFile, matches: found)
           release(findings.lock)
     of pcDir:
       let found = descendent.path.lastPathPart.find(patterns)
@@ -51,13 +54,13 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
       if found.len > 0:
        {.gcsafe.}:
          acquire(findings.lock)
-         findings.found.add (path, found, pcDir)
+         findings.found.add Found(path: path, kind: pcDir, matches: found)
          release(findings.lock)
       m.spawn findDirRec(m, path, patterns)
     else:
       discard
 
-proc find*(paths: seq[Path], patterns: seq[string]): seq[(Path, seq[int], PathComponent)] =
+proc find*(paths: seq[Path], patterns: seq[string]): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
@@ -66,7 +69,7 @@ proc find*(paths: seq[Path], patterns: seq[string]): seq[(Path, seq[int], PathCo
       of pcFile:
         let found = path.string.lastPathPart.find(patterns)
         if found.len > 0:
-          result.add @[(path, found, pcFile)]
+          result.add Found(path: path, kind: pcFile, matches: found)
       of pcDir:
         m.spawn findDirRec(getHandle m, path, patterns)
       of pcLinkToFile:
