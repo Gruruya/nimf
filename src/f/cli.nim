@@ -18,7 +18,7 @@
 ## CLI for finding files
 
 import ./paths, pkg/[cligen, malebolgia], std/[terminal, paths, osproc]
-from std/os import fileExists, dirExists, quoteShell, execShellCmd
+import std/os except getCurrentDir
 from std/strutils import startsWith, endsWith, replace
 from std/sequtils import anyIt
 export cligen
@@ -43,7 +43,7 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
   if paths.len == 0: paths = @[Path(".")]
   when defined(debug):
     echo patterns
-    echo paths
+    echo repr paths
 
   let findings = find(paths, patterns)
   for found in findings:
@@ -57,16 +57,38 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
           var curlyFound = false
           block replaceCurly:
             var i = 0
+            template replace(cmd: var string, replacement: string, length: int) =
+              if cmd.len <= i + length:
+                    cmd = cmd[0..<i] & replacement
+              else: cmd = cmd[0..<i] & replacement & cmd[i + length..^1]
+              inc i, length
+
             while true:
-              if cmd[i] == '{' and cmd[i + 1] == '}':
-                if cmd.len > i + 1:
-                  cmd = cmd[0..<i] & path & cmd[i + 2..^1]
-                else: cmd = cmd[0..<i] & path
+              if cmd.len <= i + 1: break
+              if cmd[i] == '{':
+                if cmd[i + 1] == '}':
+                  # '{}': path
+                  cmd.replace(path, 2)
+                elif cmd[i + 1] == '/':
+                  if cmd.len > i + 2 and cmd[i + 2] == '}':
+                    # '{/}': basename
+                    cmd.replace(path.lastPathPart, 3)
+                  elif cmd.len > i + 3 and cmd[i + 2] == '/' and cmd[i + 3] == '}':
+                    # '{//}': parent directory
+                    cmd.replace(path.parentDir, 4)
+                  elif cmd.len > i + 3 and cmd[i + 2] == '.' and cmd[i + 3] == '}':
+                    # '{/.}': basename without file extension
+                    cmd.replace(if found[2] == pcDir: path.lastPathPart else: path.splitFile[1], 4)
+                  else:
+                    inc i; continue
+                elif cmd.len > i + 2 and cmd[i + 1] == '.' and cmd[i + 2] == '}':
+                  # '{.}': path without file extension
+                  let split = path.splitFile()
+                  cmd.replace(split[0] / split[1], 3)
+                else: inc i; continue
                 curlyFound = true
-                inc i, 2
               else:
                 inc i
-              if i > cmd.len - "{}".len: break
           if not curlyFound: cmd = cmd & ' ' & path.quoteShell
           m.spawn execShellCmd(cmd) -> outputs[i]
 
