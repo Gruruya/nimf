@@ -17,11 +17,9 @@
 
 ## CLI for finding files
 
-import sugar
-
 import ./paths, pkg/cligen, std/terminal
 from std/os import isAbsolute, fileExists, dirExists
-from std/strutils import endsWith
+from std/strutils import startsWith, endsWith
 export cligen
 
 proc cliFind*(color = true, input: seq[string]): int =
@@ -46,12 +44,12 @@ proc cliFind*(color = true, input: seq[string]): int =
     let path = found[0].string
     if color:
       let parent = path[0 ..< path.len - path.lastPathPart.len]
-      stdout.setForegroundColor(fgBlue)
-      stdout.setStyle({styleBright})
-      if parent != "./":
-        stdout.write parent
-      if found[2] != pcDir:
-        stdout.resetAttributes()
+      if found[2] == pcDir or parent != "./":
+        stdout.setForegroundColor(fgBlue)
+        stdout.setStyle({styleBright})
+        stdout.write if parent.startsWith("./"): parent[2..^1] else: parent
+        if found[2] != pcDir:
+          stdout.resetAttributes()
       var start = parent.len
       for i in 0..found[1].high:
         let colorStart = found[1][i] + parent.len
