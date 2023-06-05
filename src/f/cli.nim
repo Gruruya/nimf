@@ -34,8 +34,8 @@ proc cliFind*(color = true, input: seq[string]): int =
   var paths: seq[Path]
   if input.len >= 1:
     for i in 0..input.high:
-      let arg = input[i] 
-      if (arg.startsWith("./") or absolutePath(Path(arg.parentDir)) != getCurrentDir()) and (dirExists(arg) and (arg.endsWith('/') or not anyIt(cast[seq[string]](paths), arg.isChildOf(it)))) or fileExists(arg):
+      let arg = input[i]
+      if (dirExists(arg) and (arg.endsWith('/') or not anyIt(cast[seq[string]](paths), arg.isChildOf(it)))) or ((arg.startsWith("./") or absolutePath(Path(arg.parentDir)) != getCurrentDir()) and fileExists(arg)):
         paths.add Path(arg) # Allow duplicate directories if input ends with /
       else:
         patterns &= arg.split(' ')
