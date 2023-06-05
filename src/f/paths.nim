@@ -18,6 +18,7 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks], pkg/malebolgia
+from std/strutils import startsWith
 export Path, parentDir, lastPathPart, PathComponent
 
 type
@@ -35,21 +36,24 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
     of pcFile:
       let found = descendent.path.lastPathPart.find(patterns)
       if found.len > 0:
-       {.gcsafe.}:
-         acquire(findings.lock)
-         findings.found.add (dir / Path(descendent.path), found, pcFile)
-         release(findings.lock)
+        let path =
+          if absolute or dir.string == ".": Path(descendent.path)
+          else: dir / Path(descendent.path)
+        {.gcsafe.}:
+          acquire(findings.lock)
+          findings.found.add (path, found, pcFile)
+          release(findings.lock)
     of pcDir:
       let found = descendent.path.lastPathPart.find(patterns)
+      let path =
+        if absolute or dir.string == ".": Path(descendent.path & '/')
+        else: dir / Path(descendent.path & '/')
       if found.len > 0:
        {.gcsafe.}:
          acquire(findings.lock)
-         findings.found.add (dir / Path(descendent.path), found, pcDir)
+         findings.found.add (path, found, pcDir)
          release(findings.lock)
-      if absolute:
-        m.spawn findDirRec(m, Path(descendent.path), patterns)
-      else:
-        m.spawn findDirRec(m, dir / Path(descendent.path), patterns)
+      m.spawn findDirRec(m, path, patterns)
     else:
       discard
 
