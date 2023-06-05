@@ -17,27 +17,33 @@
 
 ## CLI for finding files
 
-import ./paths, pkg/cligen, std/terminal
+import ./paths, pkg/cligen, std/[terminal, paths]
 from std/os import isAbsolute, fileExists, dirExists
 from std/strutils import startsWith, endsWith
+from std/sequtils import anyIt
 export cligen
+
+proc isChildOf(path, potParent: string): bool =
+  let aPotParent = absolutePath(Path(potParent))
+  for parent in Path(path).absolutePath.parentDirs:
+    if aPotParent == parent: return true
+  result = false
 
 proc cliFind*(color = true, input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
   if input.len >= 1:
-    if dirExists(input[0]) or (input[0].startsWith("./") and fileExists(input[0])):
-      paths.add Path(input[0])
-    else:
-      patterns.add input[0].split(' ')
-    for i in 1..input.high:
+    for i in 0..input.high:
       let arg = input[i] 
-      if (dirExists(arg) or ((arg.startsWith("./") or arg.parentDir != getCurrentDir().string) and fileExists(arg))) and arg notin cast[seq[string]](paths):
-        paths.add Path(arg) # Make it different based on if it's in the current directory?
+      if (dirExists(arg) or ((arg.startsWith("./") or arg.parentDir != getCurrentDir().string) and fileExists(arg))) and not anyIt(cast[seq[string]](paths), arg.isChildOf(it)): # Compare each parent directory with already added arguments
+        paths.add Path(arg)
       else:
         patterns &= arg.split(' ')
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
+  when defined(debug):
+    echo patterns
+    echo paths
 
   let findings = find(paths, patterns)
   for found in findings:
