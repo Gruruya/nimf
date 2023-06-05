@@ -1,3 +1,4 @@
 import f/cli
 
-dispatch(cliFind)
+when isMainModule:
+  cliFind()
