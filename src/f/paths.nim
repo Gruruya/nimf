@@ -18,7 +18,7 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks], pkg/malebolgia
-export Path, parentDir, lastPathPart, PathComponent
+export Path, parentDir, lastPathPart, PathComponent, paths.getCurrentDir
 
 type
   Findings = object

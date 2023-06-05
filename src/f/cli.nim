@@ -26,13 +26,13 @@ proc cliFind*(color = true, input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
   if input.len >= 1:
-    if dirExists(input[0]):
+    if dirExists(input[0]) or (input[0].startsWith("./") and fileExists(input[0])):
       paths.add Path(input[0])
     else:
       patterns.add input[0].split(' ')
     for i in 1..input.high:
       let arg = input[i] 
-      if (dirExists(arg) or fileExists(arg)) and arg notin cast[seq[string]](paths):
+      if (dirExists(arg) or ((arg.startsWith("./") or arg.parentDir != getCurrentDir().string) and fileExists(arg))) and arg notin cast[seq[string]](paths):
         paths.add Path(arg) # Make it different based on if it's in the current directory?
       else:
         patterns &= arg.split(' ')
