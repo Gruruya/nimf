@@ -66,6 +66,9 @@ proc find*(text: openArray[char], patterns: seq[string]): seq[int] =
   result = newSeqOfCap[int](patterns.len)
   var start = 0
   for pattern in patterns:
+    if pattern.len == 0:
+      result.add 0
+      continue
     if start > text.high: return @[]
     let where = if sensitive: text.findOA(pattern, start) else: text.findOAI(pattern, start)
     if where == -1: return @[]
