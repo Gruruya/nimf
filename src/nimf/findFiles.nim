@@ -45,7 +45,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
     case descendent.kind
-    of pcFile:
+    of pcFile, pcLinkToFile, pcLinkToDir:
       let found = descendent.path.lastPathPart.find(patterns)
       if found.len > 0:
         let path =
@@ -53,7 +53,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
           else: dir / Path(descendent.path)
         {.gcsafe.}:
           acquire(findings.lock)
-          findings.found.add Found(path: path, kind: pcFile, matches: found)
+          findings.found.add Found(path: path, kind: descendent.kind, matches: found)
           release(findings.lock)
     of pcDir:
       let found = descendent.path.lastPathPart.find(patterns)
@@ -75,14 +75,10 @@ proc find*(paths: openArray[Path], patterns: seq[string]): seq[Found] =
     for i, path in paths:
       let info = getFileInfo(cast[string](path))
       case info.kind
-      of pcFile:
+      of pcFile, pcLinkToFile, pcLinkToDir:
         let found = path.string.lastPathPart.find(patterns)
         if found.len > 0:
           result.add Found(path: path.stripDot, kind: pcFile, matches: found)
       of pcDir:
         m.spawn findDirRec(getHandle m, path, patterns)
-      of pcLinkToFile:
-        discard
-      of pcLinkToDir:
-        discard
   result &= findings.found
