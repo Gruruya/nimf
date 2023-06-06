@@ -1,0 +1,72 @@
+# nimtemplate --- A template to jump start your Nim library or project.
+# Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
+#
+# This file is part of nimtemplate.
+#
+# nimtemplate is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, version 3 of the License.
+#
+# nimtemplate is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with nimtemplate.  If not, see <http://www.gnu.org/licenses/>.
+
+name: documentation
+
+on:
+  push:
+    paths: ['.github/workflows/documentation.yml', '.github/workflows/nim-run/action.yml', 'src/**']
+    branches: master
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+
+jobs:
+  build-docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install Nim, then generate docs
+      uses: './.github/workflows/nim-run'
+      with:
+        run: nimble doc -y --project src/nimtemplate.nim --outDir:htmldocs
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - run: ln -s nimtemplate.html htmldocs/index.html
+
+    - name: Setup HTML for GitHub Pages
+      uses: actions/configure-pages@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Docs
+      uses: actions/upload-pages-artifact@v1
+      with:
+        path: 'htmldocs'
+
+  deploy-gh-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build-docs
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
