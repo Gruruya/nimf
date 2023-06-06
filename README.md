@@ -1,7 +1,6 @@
 # nimf
 
-`find`-like  
-_search for files in a directory hierarchy_
+`find`-like, search for files in a directory hierarchy  
 
 Usage
 ---
