@@ -90,43 +90,43 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
       const targets = ["{}", "{/}", "{//}", "{/.}", "{.}"]
       var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
       var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
-      template needsIt[T](variable: var T, constructor: untyped) =
+      template needs[T](variable: var T, constructor: T) =
         if variable.len == 0: variable = constructor
       template makeFindExeReplacements() =
         for t in targets.low..targets.high:
           if allIndexes[t].len > 0:
             case t
-            of 0: replaceIt(targets[t], paths, mapIt(findings, it.path.string.quoteShell))
-            of 1: replaceIt(targets[t], filenames, mapIt(findings, it.path.lastPathPart.string))
-            of 2: replaceIt(targets[t], parentDirs, mapIt(findings, it.path.parentDir.string))
-            of 3: replaceIt(targets[t], noExtFilenames, mapIt(findings, if it.kind == pcDir: needsIt(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
-            of 4: replaceIt(targets[t], noExtPaths, mapIt(findings, it.path.stripExtension.string))
+            of 0: replaceCmd(targets[t], paths, mapIt(findings, it.path.string.quoteShell))
+            of 1: replaceCmd(targets[t], filenames, mapIt(findings, it.path.lastPathPart.string))
+            of 2: replaceCmd(targets[t], parentDirs, mapIt(findings, it.path.parentDir.string))
+            of 3: replaceCmd(targets[t], noExtFilenames, mapIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
+            of 4: replaceCmd(targets[t], noExtPaths, mapIt(findings, it.path.stripExtension.string))
       for inCmd in exec:
         let allIndexes = inCmd.findAll(targets)
         var combined = inCmd.endsWith '+'
         if combined:
           var cmd = inCmd[0..^2]
-          macro replaceIt[T](toReplace: untyped, variable: var T, constructor: untyped) =
+          macro replaceCmd[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
             let variableString = ident($variable & "String")
             quote do:
-              needsIt(`variable`, `constructor`)
-              needsIt(`variableString`, `variable`.join(" "))
+              needs(`variable`, `constructor`)
+              needs(`variableString`, `variable`.join(" "))
               cmd = cmd.replace(`toReplace`, `variableString`)
           makeFindExeReplacements()
           if cmd == inCmd[0..^2]:
-            needsIt(paths, mapIt(findings, it.path.string.quoteShell))
-            needsIt(pathsString, paths.join(" "))
+            needs(paths, mapIt(findings, it.path.string.quoteShell))
+            needs(pathsString, paths.join(" "))
             cmd = inCmd[0..^2] & ' ' & pathsString
           m.spawn run cmd
         else:
           for i in findings.low..findings.high:
             var cmd = inCmd
-            template replaceIt[T](toReplace: untyped, variable: var T, constructor: untyped) =
-              needsIt(variable, constructor)
+            template replaceCmd[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
+              needs(variable, constructor)
               cmd = cmd.replace(toReplace, variable[i])
             makeFindExeReplacements()
             if cmd == inCmd:
-              needsIt(paths, mapIt(findings, it.path.string.quoteShell))
+              needs(paths, mapIt(findings, it.path.string.quoteShell))
               cmd = inCmd & ' ' & paths[i]
             m.spawn run cmd
   else:
