@@ -60,7 +60,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
     else:
       discard
 
-proc find*(paths: seq[Path], patterns: seq[string]): seq[Found] =
+proc find*(paths: openArray[Path], patterns: seq[string]): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:

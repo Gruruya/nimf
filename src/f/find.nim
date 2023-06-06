@@ -20,14 +20,14 @@
 {.push inline, checks: off.}
 
 func continuesWith(text, substr: openArray[char], start: Natural): bool =
-  ## Checks if text[1..^1] == substr[start + 1..^1]
-  for i in 1 .. substr.high:
+  ## Checks if `substr` is in `text` starting at `start`
+  for i in 0 .. substr.high:
     if text[i + start] != substr[i]: return false
   result = true
 
-proc findOA*(text, pattern: openArray[char], start = 0): int =
+func findOA*(text, pattern: openArray[char], start = 0): int =
   for i in start..text.len - pattern.len:
-    if text[i] == pattern[0] and text.continuesWith(pattern, i):
+    if text.continuesWith(pattern, i):
       return i
   result = -1
 
@@ -36,18 +36,18 @@ func toLowerAscii(c: char): char =
     char(uint8(c) xor 0b0010_0000'u8)
   else: c
 
-proc cmpInsensitive(a, b: char): bool =
+func cmpInsensitive(a, b: char): bool =
   a.toLowerAscii == b.toLowerAscii
 
-proc continuesWith(text, substr: openArray[char], start: Natural, cmp: proc): bool =
-  ## Checks if text[1..^1] == substr[start + 1..^1], custom comparison procedure variant
-  for i in 1 .. substr.high:
-    if cmp(text[i + start], substr[i]): return false
+func continuesWith(text, substr: openArray[char], start: Natural, cmp: proc): bool =
+  ## Checks if `substr` is in `text` starting at `start`, custom comparison procedure variant
+  for i in 0 .. substr.high:
+    if not cmp(text[i + start], substr[i]): return false
   result = true
 
-proc findOAI*(text, pattern: openArray[char], start = 0): int =
+func findI*(text, pattern: openArray[char], start = 0): int =
   for i in start..text.len - pattern.len:
-    if cmpInsensitive(text[i], pattern[0]) and text.continuesWith(pattern, i, cmpInsensitive):
+    if text.continuesWith(pattern, i, cmpInsensitive):
       return i
   result = -1
 
@@ -55,15 +55,7 @@ template find*(text, pattern: string, start = 0): int =
   ## Patterns must match in order
   findOA(text, pattern, start)
 
-template find2*(text, pattern: string, start = 0): int =
-  ## Patterns must match in order
-  findOA(text, pattern, start)
-
-template findI*(text, pattern: string, start = 0): int =
-  ## Patterns must match in order
-  findOAI(text, pattern, start)
-
-proc find*(text: openArray[char], patterns: seq[string]): seq[int] =
+func find*(text: openArray[char], patterns: seq[string]): seq[int] =
   ## Patterns must match in order
   var sensitive = false
   block smartCase:
@@ -79,37 +71,33 @@ proc find*(text: openArray[char], patterns: seq[string]): seq[int] =
       result.add 0
       continue
     if start > text.high: return @[]
-    let where = if sensitive: text.findOA(pattern, start) else: text.findOAI(pattern, start)
+    let where = if sensitive: text.findOA(pattern, start) else: text.findI(pattern, start)
     if where == -1: return @[]
     result.add where
     start = where + pattern.len
 
-func continuesWithB(text, substr: string, start: Natural): bool =
-  ## Checks if text[1..^1] == substr[start + 1..^1], bounds-checking variant
-  if substr.high + start >= text.len:
-    result = false
-  else:
-    for i in 1 .. substr.high:
-      if text[i + start] != substr[i]: return false
-    result = true
+func continuesWithB(text, substr: openArray[char], start: Natural): bool =
+  ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant
+  if substr.high + start < text.len:
+        continuesWith(text, substr, start)
+  else: false
 
-proc findAll*(text: string, pattern: string): seq[int] =
+func findAll*(text, pattern: openArray[char]): seq[int] =
   ## Find all matches in any order
   if unlikely pattern.len == 0: return @[]
   var i = 0
   while i < text.len:
-    if text[i] == pattern[0] and text.continuesWithB(pattern, i):
+    if text.continuesWithB(pattern, i):
       result.add i
       inc(i, pattern.len)
     else:
       inc(i)
 
-proc findAll*(text: string, patterns: seq[string]): seq[seq[int]] =
+func findAll*(text: openArray[char], patterns: seq[string]): seq[seq[int]] =
   ## Find all matches in any order for all patterns in a single pass
   result = newSeq[seq[int]](patterns.len)
   for i in 0..text.high:
     for j, pattern in patterns:
       if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and
-         text[i] == pattern[0] and
          text.continuesWithB(pattern, i):
            result[j].add i

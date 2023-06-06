@@ -17,8 +17,8 @@
 
 ## CLI for finding files
 
-import ./findFiles, pkg/[cligen, malebolgia], std/[terminal, paths]
-import std/os except getCurrentDir, getAppFilename
+import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths]
+import std/os except getCurrentDir
 from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt
 from std/posix import sysconf, SC_ARG_MAX # Could make Windows compatible, according to ChatGPT the general limit on there is 32767
@@ -106,17 +106,19 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
           # unicode chars could be an issue?
         for inCmd in exec:
           if inCmd.endsWith '+':
+            var replaceLocations = inCmd.findAll(@["{}", "{/}", "{//}", "{/.}", "{.}"])
+            var replacements = @[0]
             var batchStart = 0
             var batchEnd = min(inCmd.len, batchMax)
             # while true # iterate over batchSize
             let inCmd = inCmd[0..^2]
-            var cmd = inCmd.multiReplace(("{}", pathsString),
-                                         ("{/}", filenamesString),
-                                         ("{//}", parentDirsString),
-                                         ("{/.}", noExtFilenamesString),
-                                         ("{.}", noExtPathsString))
-            if cmd == inCmd: cmd = inCmd & ' ' & pathsString
-            m.spawn run cmd # Seem to be hitting a command-line limit, should look into that
+            # var cmd = inCmd.multiFindAll(("{}", pathsString),
+            #                              ("{/}", filenamesString),
+            #                              ("{//}", parentDirsString),
+            #                              ("{/.}", noExtFilenamesString),
+            #                              ("{.}", noExtPathsString))
+#            if cmd == inCmd: cmd = inCmd & ' ' & pathsString
+#            m.spawn run cmd # Seem to be hitting a command-line limit, should look into that
           else:
             runCmd()
   else:
