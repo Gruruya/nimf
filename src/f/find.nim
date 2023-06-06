@@ -17,39 +17,45 @@
 
 ## Finding primitives
 
-{.push checks: off.}
+{.push inline, checks: off.}
 
-proc findOA*(text, pattern: openArray[char], start = 0): int {.inline.} =
+func continuesWith(text, substr: openArray[char], start: Natural): bool =
+  ## Checks if text[1..^1] == substr[start + 1..^1]
+  for i in 1 .. substr.high:
+    if text[i + start] != substr[i]: return false
+  result = true
+
+proc findOA*(text, pattern: openArray[char], start = 0): int =
   for i in start..text.len - pattern.len:
-    if text[i] == pattern[0]:
-      var matches = true
-      for i2 in 1 ..< pattern.len:
-        if text[i + i2] != pattern[i2]:
-          matches = false
-          break
-      if matches: return i
+    if text[i] == pattern[0] and text.continuesWith(pattern, i):
+      return i
   result = -1
 
-func toLowerAscii(c: char): char {.inline.} =
+func toLowerAscii(c: char): char =
   if c in {'A'..'Z'}:
     char(uint8(c) xor 0b0010_0000'u8)
   else: c
 
-proc cmpInsensitive(a, b: char): bool {.inline.} =
+proc cmpInsensitive(a, b: char): bool =
   a.toLowerAscii == b.toLowerAscii
 
-proc findOAI*(text, pattern: openArray[char], start = 0): int {.inline.} =
+proc continuesWith(text, substr: openArray[char], start: Natural, cmp: proc): bool =
+  ## Checks if text[1..^1] == substr[start + 1..^1], custom comparison procedure variant
+  for i in 1 .. substr.high:
+    if cmp(text[i + start], substr[i]): return false
+  result = true
+
+proc findOAI*(text, pattern: openArray[char], start = 0): int =
   for i in start..text.len - pattern.len:
-    if cmpInsensitive(text[i], pattern[0]):
-      var matches = true
-      for i2 in 1 ..< pattern.len:
-        if not cmpInsensitive(text[i + i2], pattern[i2]):
-          matches = false
-          break
-      if matches: return i
+    if cmpInsensitive(text[i], pattern[0]) and text.continuesWith(pattern, i, cmpInsensitive):
+      return i
   result = -1
 
 template find*(text, pattern: string, start = 0): int =
+  ## Patterns must match in order
+  findOA(text, pattern, start)
+
+template find2*(text, pattern: string, start = 0): int =
   ## Patterns must match in order
   findOA(text, pattern, start)
 
@@ -78,11 +84,12 @@ proc find*(text: openArray[char], patterns: seq[string]): seq[int] =
     result.add where
     start = where + pattern.len
 
-func continuesWith*(text, substr: string, start: Natural): bool {.inline.} =
+func continuesWithB(text, substr: string, start: Natural): bool =
+  ## Checks if text[1..^1] == substr[start + 1..^1], bounds-checking variant
   if substr.high + start >= text.len:
     result = false
   else:
-    for i in 0 .. substr.high:
+    for i in 1 .. substr.high:
       if text[i + start] != substr[i]: return false
     result = true
 
@@ -91,7 +98,7 @@ proc findAll*(text: string, pattern: string): seq[int] =
   if unlikely pattern.len == 0: return @[]
   var i = 0
   while i < text.len:
-    if text[i] == pattern[0] and text.continuesWith(pattern, i):
+    if text[i] == pattern[0] and text.continuesWithB(pattern, i):
       result.add i
       inc(i, pattern.len)
     else:
@@ -100,13 +107,9 @@ proc findAll*(text: string, pattern: string): seq[int] =
 proc findAll*(text: string, patterns: seq[string]): seq[seq[int]] =
   ## Find all matches in any order for all patterns in a single pass
   result = newSeq[seq[int]](patterns.len)
-  var fastChk: set[char] = {}
-  for pattern in patterns:
-    if pattern.len > 0:
-      # Include first character of all patterns
-      fastChk.incl pattern[0]
   for i in 0..text.high:
-    if text[i] in fastChk:
-      for j, pattern in patterns:
-        if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and text.continuesWith(pattern, i):
-          result[j].add i
+    for j, pattern in patterns:
+      if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and
+         text[i] == pattern[0] and
+         text.continuesWithB(pattern, i):
+           result[j].add i
