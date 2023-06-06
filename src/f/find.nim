@@ -50,12 +50,15 @@ proc findOAI*(text, pattern: openArray[char], start = 0): int {.inline.} =
   result = -1
 
 template find*(text, pattern: string, start = 0): int =
+  ## Patterns must match in order
   findOA(text, pattern, start)
 
 template findI*(text, pattern: string, start = 0): int =
+  ## Patterns must match in order
   findOAI(text, pattern, start)
 
 proc find*(text: openArray[char], patterns: seq[string]): seq[int] =
+  ## Patterns must match in order
   var sensitive = false
   block smartCase:
     for s in patterns:
@@ -74,3 +77,36 @@ proc find*(text: openArray[char], patterns: seq[string]): seq[int] =
     if where == -1: return @[]
     result.add where
     start = where + pattern.len
+
+func continuesWith*(text, substr: string, start: Natural): bool {.inline.} =
+  if substr.high + start >= text.len:
+    result = false
+  else:
+    for i in 0 .. substr.high:
+      if text[i + start] != substr[i]: return false
+    result = true
+
+proc findAll*(text: string, pattern: string): seq[int] =
+  ## Find all matches in any order
+  if unlikely pattern.len == 0: return @[]
+  var i = 0
+  while i < text.len:
+    if text[i] == pattern[0] and text.continuesWith(pattern, i):
+      result.add i
+      inc(i, pattern.len)
+    else:
+      inc(i)
+
+proc findAll*(text: string, patterns: seq[string]): seq[seq[int]] =
+  ## Find all matches in any order for all patterns in a single pass
+  result = newSeq[seq[int]](patterns.len)
+  var fastChk: set[char] = {}
+  for pattern in patterns:
+    if pattern.len > 0:
+      # Include first character of all patterns
+      fastChk.incl pattern[0]
+  for i in 0..text.high:
+    if text[i] in fastChk:
+      for j, pattern in patterns:
+        if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and text.continuesWith(pattern, i):
+          result[j].add i
