@@ -27,7 +27,10 @@ export cligen
 
 proc isChildOf(path, potParent: string): bool =
   let aPotParent = absolutePath(Path(potParent))
-  for parent in Path(path).absolutePath.parentDirs:
+  let aPath = absolutePath(Path(path))
+  if aPath == aPotParent:
+    return true
+  for parent in aPath.parentDirs:
     if aPotParent == parent: return true
   result = false
 
@@ -58,8 +61,19 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
   if input.len >= 1:
     for i in 0..input.high:
       let arg = input[i]
-      if (dirExists(arg) and (arg.endsWith('/') or not anyIt(cast[seq[string]](paths), arg.isChildOf(it)))) or ((arg.startsWith("./") or absolutePath(Path(arg.parentDir)) != getCurrentDir()) and fileExists(arg)):
-        paths.add Path(arg) # Glob all directories/allow shorthand like ./m for ./man
+      proc alreadyAdded(arg: string): bool =
+        anyIt(cast[seq[string]](paths), arg.isChildOf(it))
+      proc isDir(arg: string): bool =
+        dirExists(arg) and (arg.endsWith('/') or not arg.alreadyAdded)
+      if arg.startsWith("./"):
+        if (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and (dirExists(arg) or fileExists(arg))):
+          paths.add Path(arg)
+        else:
+          for path in walkPattern(if '*' in arg: arg else: arg & '*'):
+            if not path.alreadyAdded:
+              paths.add Path(path)
+      elif (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and (absolutePath(Path(arg.parentDir)) != getCurrentDir() and (dirExists(arg) or fileExists(arg)))):
+        paths.add Path(arg)
       else:
         patterns &= arg.split(' ')
   if patterns.len == 0: patterns = @[""]
@@ -107,6 +121,8 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
         for inCmd in exec:
           if inCmd.endsWith '+':
             var replaceLocations = inCmd.findAll(@["{}", "{/}", "{//}", "{/.}", "{.}"])
+            var length = inCmd.len + 1
+
             var replacements = @[0]
             var batchStart = 0
             var batchEnd = min(inCmd.len, batchMax)

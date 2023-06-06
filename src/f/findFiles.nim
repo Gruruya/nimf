@@ -18,6 +18,7 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks], pkg/malebolgia
+from std/strutils import startsWith
 export Path, parentDir, lastPathPart, PathComponent
 
 type
@@ -32,6 +33,14 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
+proc stripDot*(s: string): string =
+  if s.len > 2 and s[0..1] == "./": s[2..^1]
+  else: s
+
+proc stripDot*(p: Path): Path =
+  if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
+  else: p
+
 proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
@@ -40,7 +49,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
       let found = descendent.path.lastPathPart.find(patterns)
       if found.len > 0:
         let path =
-          if absolute or dir.string == ".": Path(descendent.path)
+          if absolute or dir.string in [".", "./"]: Path(descendent.path)
           else: dir / Path(descendent.path)
         {.gcsafe.}:
           acquire(findings.lock)
@@ -49,7 +58,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
     of pcDir:
       let found = descendent.path.lastPathPart.find(patterns)
       let path =
-        if absolute or dir.string == ".": Path(descendent.path & '/')
+        if absolute or dir.string in [".", "./"]: Path(descendent.path & '/')
         else: dir / Path(descendent.path & '/')
       if found.len > 0:
        {.gcsafe.}:
@@ -69,7 +78,7 @@ proc find*(paths: openArray[Path], patterns: seq[string]): seq[Found] =
       of pcFile:
         let found = path.string.lastPathPart.find(patterns)
         if found.len > 0:
-          result.add Found(path: path, kind: pcFile, matches: found)
+          result.add Found(path: path.stripDot, kind: pcFile, matches: found)
       of pcDir:
         m.spawn findDirRec(getHandle m, path, patterns)
       of pcLinkToFile:
