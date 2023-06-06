@@ -21,8 +21,6 @@ import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, macr
 import std/os except getCurrentDir
 from std/strutils import startsWith, endsWith, replace
 from std/sequtils import anyIt
-from std/posix import sysconf, SC_ARG_MAX # Could make Windows compatible, according to ChatGPT the general limit on there is 32767
-from std/envvars import envPairs
 export cligen
 
 proc isChildOf(path, potParent: string): bool =
@@ -40,20 +38,13 @@ proc stripExtension(path: Path): Path =
 
 template mapIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
-    var i{.inject.}: int;
+    var i{.inject, used.}: int;
     var it{.inject.}: typeof(items(collection), typeOfIter);
     op), typeOfProc)
   var result = newSeqOfCap[OutType](collection.len)
   for i {.inject.}, it {.inject.} in collection:
     result.add op
   result
-
-proc countEnvLen(): int =
-  for key, value in envPairs():
-    result += key.len   # VARIABLE
-    result += 2         # \0=
-    result += value.len # value
-    result += 1         # \0
 
 proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
   var patterns: seq[string]
@@ -63,8 +54,6 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
       let arg = input[i]
       proc alreadyAdded(arg: string): bool =
         anyIt(cast[seq[string]](paths), arg.isChildOf(it))
-      proc isDir(arg: string): bool =
-        dirExists(arg) and (arg.endsWith('/') or not arg.alreadyAdded)
       if arg.startsWith("./"):
         if (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and (dirExists(arg) or fileExists(arg))):
           paths.add Path(arg)
