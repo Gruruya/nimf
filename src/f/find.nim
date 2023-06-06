@@ -21,12 +21,12 @@
 
 func continuesWith(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`
-  for i in 0 .. substr.high:
+  for i in substr.low .. substr.high:
     if text[i + start] != substr[i]: return false
   result = true
 
 func findOA*(text, pattern: openArray[char], start = 0): int =
-  for i in start..text.len - pattern.len:
+  for i in text.low + start..text.len - pattern.len:
     if text.continuesWith(pattern, i):
       return i
   result = -1
@@ -41,12 +41,12 @@ func cmpInsensitive(a, b: char): bool =
 
 func continuesWith(text, substr: openArray[char], start: Natural, cmp: proc): bool =
   ## Checks if `substr` is in `text` starting at `start`, custom comparison procedure variant
-  for i in 0 .. substr.high:
+  for i in substr.low .. substr.high:
     if not cmp(text[i + start], substr[i]): return false
   result = true
 
 func findI*(text, pattern: openArray[char], start = 0): int =
-  for i in start..text.len - pattern.len:
+  for i in text.low + start..text.len - pattern.len:
     if text.continuesWith(pattern, i, cmpInsensitive):
       return i
   result = -1
@@ -78,15 +78,15 @@ func find*(text: openArray[char], patterns: seq[string]): seq[int] =
 
 func continuesWithB(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant
-  if substr.high + start < text.len:
+  if substr.len + start <= text.len:
         continuesWith(text, substr, start)
   else: false
 
 func findAll*(text, pattern: openArray[char]): seq[int] =
   ## Find all matches in any order
   if unlikely pattern.len == 0: return @[]
-  var i = 0
-  while i < text.len:
+  var i = text.low
+  while i <= text.high:
     if text.continuesWithB(pattern, i):
       result.add i
       inc(i, pattern.len)
@@ -96,7 +96,7 @@ func findAll*(text, pattern: openArray[char]): seq[int] =
 func findAll*(text: openArray[char], patterns: seq[string]): seq[seq[int]] =
   ## Find all matches in any order for all patterns in a single pass
   result = newSeq[seq[int]](patterns.len)
-  for i in 0..text.high:
+  for i in text.low..text.high:
     for j, pattern in patterns:
       if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and
          text.continuesWithB(pattern, i):
