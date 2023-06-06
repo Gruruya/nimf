@@ -17,9 +17,9 @@
 
 ## CLI for finding files
 
-import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths]
+import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace
+from std/strutils import startsWith, endsWith, replace
 from std/sequtils import anyIt
 from std/posix import sysconf, SC_ARG_MAX # Could make Windows compatible, according to ChatGPT the general limit on there is 32767
 from std/envvars import envPairs
@@ -84,59 +84,51 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
 
   let findings = find(paths, patterns)
   if exec.len > 0:
-    var outputs = newSeq[int](exec.len)
     var m = createMaster()
     proc run(cmd: string) = discard execShellCmd(cmd)
     m.awaitAll:
-      let
-        paths = mapIt(findings, it.path.string.quoteShell)
-        filenames = mapIt(findings, it.path.lastPathPart.string)
-        parentDirs = mapIt(findings, it.path.parentDir.string)
-        noExtFilenames = mapIt(findings, if it.kind == pcDir: filenames[i] else: it.path.splitFile[1].string)
-        noExtPaths = mapIt(findings, it.path.stripExtension.string)
-      template runCmd(): untyped =
-        for inCmd in exec:
+      const targets = ["{}", "{/}", "{//}", "{/.}", "{.}"]
+      var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
+      var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
+      template needsIt[T](variable: var T, constructor: untyped) =
+        if variable.len == 0: variable = constructor
+      template makeFindExeReplacements() =
+        for t in targets.low..targets.high:
+          if allIndexes[t].len > 0:
+            case t
+            of 0: t.replaceIt(paths, mapIt(findings, it.path.string.quoteShell))
+            of 1: t.replaceIt(filenames, mapIt(findings, it.path.lastPathPart.string))
+            of 2: t.replaceIt(parentDirs, mapIt(findings, it.path.parentDir.string))
+            of 3: t.replaceIt(noExtFilenames, mapIt(findings, if it.kind == pcDir: needsIt(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
+            of 4: t.replaceIt(noExtPaths, mapIt(findings, it.path.stripExtension.string))
+      for inCmd in exec:
+        let allIndexes = inCmd.findAll(targets)
+        var combined = inCmd.endsWith '+'
+        if combined:
+          var cmd = if combined: inCmd[0..^2] else: inCmd
+          macro replaceIt[T](t: int, variable: var T, constructor: untyped) =
+            let variableString = ident($variable & "String")
+            quote do:
+              needsIt(`variable`, `constructor`)
+              cmd = block:
+                  needsIt(`variableString`, `variable`.join(" "))
+                  cmd.replace(targets[`t`], `variableString`)
+          makeFindExeReplacements()
+          if cmd == inCmd:
+            needsIt(paths, mapIt(findings, it.path.string.quoteShell))
+            cmd = inCmd & ' ' & pathsString
+          m.spawn run cmd
+        else:
           for i in findings.low..findings.high:
-            var cmd = inCmd.multiReplace(("{}", paths[i]),
-                                         ("{/}", filenames[i]),
-                                         ("{//}", parentDirs[i]),
-                                         ("{/.}", noExtFilenames[i]),
-                                         ("{.}", noExtPaths[i]))
-            if cmd == inCmd: cmd = inCmd & ' ' & paths[i]
+            var cmd = if combined: inCmd[0..^2] else: inCmd
+            template replaceIt[T](t: int, variable: var T, constructor: untyped) =
+              needsIt(variable, constructor)
+              cmd = cmd.replace(targets[t], variable[i])
+            makeFindExeReplacements()
+            if cmd == inCmd:
+              needsIt(paths, mapIt(findings, it.path.string.quoteShell))
+              cmd = inCmd & ' ' & paths[i]
             m.spawn run cmd
-      if not anyIt(exec, it.endsWith '+'):
-        runCmd()
-      else:
-        let
-          pathsString = paths.join(" ")
-          filenamesString = filenames.join(" ")
-          parentDirsString = parentDirs.join(" ") # need findAll and then get count that way
-          noExtFilenamesString = noExtFilenames.join(" ")
-          noExtPathsString = noExtPaths.join(" ")
-          argMax = sysconf(SC_ARG_MAX) # Maximum (byte) length for a command, includes the command and environment variables
-          cmdLen = getAppFilename().len + 1
-          envLen = countEnvLen()
-          batchMax = argMax - cmdLen - envLen - 1 # cmd array null terminator, also need to consider null terminator/space per item
-          # unicode chars could be an issue?
-        for inCmd in exec:
-          if inCmd.endsWith '+':
-            #TODO: Handle batching and such
-            # var replaceLocations = inCmd.findAll(@["{}", "{/}", "{//}", "{/.}", "{.}"])
-            # var length = inCmd.len + 1
-
-            # var replacements = @[0]
-            # var batchStart = 0
-            # var batchEnd = min(inCmd.len, batchMax)
-            let inCmd = inCmd[0..^2]
-            var cmd = inCmd.multiReplace(("{}", pathsString),
-                                         ("{/}", filenamesString),
-                                         ("{//}", parentDirsString),
-                                         ("{/.}", noExtFilenamesString),
-                                         ("{.}", noExtPathsString))
-            if cmd == inCmd: cmd = inCmd & ' ' & pathsString
-            m.spawn run cmd
-          else:
-            runCmd()
   else:
     for found in findings:
       let path = found.path.string

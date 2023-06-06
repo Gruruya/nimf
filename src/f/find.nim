@@ -93,7 +93,7 @@ func findAll*(text, pattern: openArray[char]): seq[int] =
     else:
       inc(i)
 
-func findAll*(text: openArray[char], patterns: seq[string]): seq[seq[int]] =
+func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[int]] =
   ## Find all matches in any order for all patterns in a single pass
   result = newSeq[seq[int]](patterns.len)
   for i in text.low..text.high:
