@@ -18,9 +18,11 @@
 ## CLI for finding files
 
 import ./findFiles, pkg/[cligen, malebolgia], std/[terminal, paths]
-import std/os except getCurrentDir
+import std/os except getCurrentDir, getAppFilename
 from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt
+from std/posix import sysconf, SC_ARG_MAX # Could make Windows compatible, according to ChatGPT the general limit on there is 32767
+from std/envvars import envPairs
 export cligen
 
 proc isChildOf(path, potParent: string): bool =
@@ -42,6 +44,13 @@ template mapIt[T](collection: openArray[T], op: untyped): seq =
   for i {.inject.}, it {.inject.} in collection:
     result.add op
   result
+
+proc countEnvLen(): int =
+  for key, value in envPairs():
+    result += key.len   # VARIABLE
+    result += 2         # \0=
+    result += value.len # value
+    result += 1         # \0
 
 proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
   var patterns: seq[string]
@@ -87,11 +96,19 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
         let
           pathsString = paths.join(" ")
           filenamesString = filenames.join(" ")
-          parentDirsString = parentDirs.join(" ")
+          parentDirsString = parentDirs.join(" ") # need findAll and then get count that way
           noExtFilenamesString = noExtFilenames.join(" ")
           noExtPathsString = noExtPaths.join(" ")
+          argMax = sysconf(SC_ARG_MAX) # Maximum (byte) length for a command, includes the command and environment variables
+          cmdLen = getAppFilename().len + 1
+          envLen = countEnvLen()
+          batchMax = argMax - cmdLen - envLen - 1 # cmd array null terminator, also need to consider null terminator/space per item
+          # unicode chars could be an issue?
         for inCmd in exec:
-          if inCmd.endsWith '+': 
+          if inCmd.endsWith '+':
+            var batchStart = 0
+            var batchEnd = min(inCmd.len, batchMax)
+            # while true # iterate over batchSize
             let inCmd = inCmd[0..^2]
             var cmd = inCmd.multiReplace(("{}", pathsString),
                                          ("{/}", filenamesString),
@@ -99,7 +116,7 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
                                          ("{/.}", noExtFilenamesString),
                                          ("{.}", noExtPathsString))
             if cmd == inCmd: cmd = inCmd & ' ' & pathsString
-            m.spawn run cmd
+            m.spawn run cmd # Seem to be hitting a command-line limit, should look into that
           else:
             runCmd()
   else:
