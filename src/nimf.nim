@@ -18,4 +18,4 @@
 import nimf/cli
 
 when isMainModule:
-  dispatch(cliFind, short = {"exec": 'x'})
+  f()

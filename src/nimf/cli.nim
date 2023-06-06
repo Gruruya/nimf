@@ -19,7 +19,7 @@
 
 import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace
+from std/strutils import startsWith, endsWith, multiReplace, dedent
 from std/sequtils import anyIt
 export cligen
 
@@ -147,5 +147,20 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
       else:
         echo path
 
+proc f*() =
+  dispatch(cliFind, cmdName = "f",
+                    short = {"exec": 'x'},
+                    help = {"exec": "Execute a command for each matching search result in parallel.\n" &
+                                    "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
+                                    "Example: f .nim -x \"$EDITOR\"+\n" &
+                                    "The following placeholders are substituted before the command is executed:\n" &
+                                    "\"{}\":   path (of the current search result)\n" &
+                                    "\"{/}\":  basename\n" &
+                                    "\"{//}\": parent directory\n" &
+                                    "\"{.}\":  path without file extension\n" &
+                                    "\"{/.}\": basename without file extension\n" &
+                                    "Example: f .jpg -x 'convert {} {.}.png'\n" &
+                                    "If no placeholder is present, an implicit \"{}\" at the end is assumed."})
+
 when isMainModule:
-  dispatch(cliFind, short = {"exec": 'x'})
+  f()
