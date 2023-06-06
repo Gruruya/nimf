@@ -21,12 +21,12 @@
 
 func continuesWith(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`
-  for i in substr.low .. substr.high:
+  for i in substr.low..substr.high:
     if text[i + start] != substr[i]: return false
   result = true
 
 func findOA*(text, pattern: openArray[char], start = 0): int =
-  for i in text.low + start..text.len - pattern.len:
+  for i in start..text.len - pattern.len:
     if text.continuesWith(pattern, i):
       return i
   result = -1
@@ -41,12 +41,12 @@ func cmpInsensitive(a, b: char): bool =
 
 func continuesWith(text, substr: openArray[char], start: Natural, cmp: proc): bool =
   ## Checks if `substr` is in `text` starting at `start`, custom comparison procedure variant
-  for i in substr.low .. substr.high:
+  for i in substr.low..substr.high:
     if not cmp(text[i + start], substr[i]): return false
   result = true
 
 func findI*(text, pattern: openArray[char], start = 0): int =
-  for i in text.low + start..text.len - pattern.len:
+  for i in start..text.len - pattern.len:
     if text.continuesWith(pattern, i, cmpInsensitive):
       return i
   result = -1
