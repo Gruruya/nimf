@@ -15,16 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with nimf.  If not, see <http://www.gnu.org/licenses/>.
 
-## This is just an example to get you started. You may wish to put all of your
-## tests into a single file, or separate them into multiple `test1`, `test2
-## etc. files (better names are recommended, just make sure the name starts with
-## the letter 't').
-##
-## To run these tests, simply execute `nimble test`.
+import nimf/cli
 
-import pkg/balls
-import ./nimf
-
-suite "example":
-  block operation:
-    check 1 + 1 == 2
+when isMainModule:
+  dispatch(cliFind, short = {"exec": 'x'})

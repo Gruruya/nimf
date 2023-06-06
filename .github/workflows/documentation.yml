@@ -1,19 +1,19 @@
-# f --- Text finder
+# nimf --- Text finder
 # Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
 #
-# This file is part of f.
+# This file is part of nimf.
 #
-# f is free software: you can redistribute it and/or modify
+# nimf is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, version 3 of the License.
 #
-# f is distributed in the hope that it will be useful,
+# nimf is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with f.  If not, see <http://www.gnu.org/licenses/>.
+# along with nimf.  If not, see <http://www.gnu.org/licenses/>.
 
 name: documentation
 
@@ -43,10 +43,10 @@ jobs:
     - name: Install Nim, then generate docs
       uses: './.github/workflows/nim-run'
       with:
-        run: nimble doc -y --project src/f.nim --outDir:htmldocs
+        run: nimble doc -y --project src/nimf.nim --outDir:htmldocs
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - run: ln -s f.html htmldocs/index.html
+    - run: ln -s nimf.html htmldocs/index.html
 
     - name: Setup HTML for GitHub Pages
       uses: actions/configure-pages@v3

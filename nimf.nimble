@@ -5,7 +5,7 @@ license     = "AGPL-3.0-only"
 
 srcDir = "src"
 skipDirs = @["tests"]
-bin = @["f"]
+namedBin["nimf"] = "f"
 
 # Dependencies
 requires "nim >= 1.9.3"
