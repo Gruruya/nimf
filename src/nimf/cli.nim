@@ -72,56 +72,7 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
     echo repr paths
 
   let findings = find(paths, patterns)
-  if exec.len > 0:
-    var m = createMaster()
-    proc run(cmd: string) = discard execShellCmd(cmd)
-    m.awaitAll:
-      const targets = ["{}", "{/}", "{//}", "{/.}", "{.}"]
-      var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
-      var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
-      template needs[T](variable: var T, constructor: T) =
-        if variable.len == 0: variable = constructor
-      template addFindExeReplacements() =
-        for t in targets.low..targets.high:
-          if allIndexes[t].len > 0:
-            case t
-            of 0: addReplacement(targets[t], paths, mapIt(findings, it.path.string.quoteShell))
-            of 1: addReplacement(targets[t], filenames, mapIt(findings, it.path.lastPathPart.string))
-            of 2: addReplacement(targets[t], parentDirs, mapIt(findings, it.path.parentDir.string))
-            of 3: addReplacement(targets[t], noExtFilenames, mapIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
-            of 4: addReplacement(targets[t], noExtPaths, mapIt(findings, it.path.stripExtension.string))
-      for cmd in exec:
-        let allIndexes = cmd.findAll(targets)
-        var combined = cmd.endsWith '+'
-        if combined:
-          let cmd = cmd[0..^2]
-          var replacements = newSeqOfCap[(string, string)](targets.len)
-          macro addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
-            let variableString = ident($variable & "String")
-            quote do:
-              needs(`variable`, `constructor`)
-              needs(`variableString`, `variable`.join(" "))
-              replacements.add (`toReplace`, `variableString`)
-          addFindExeReplacements()
-          if replacements.len == 0:
-            needs(paths, mapIt(findings, it.path.string.quoteShell))
-            needs(pathsString, paths.join(" "))
-            m.spawn run cmd & ' ' & pathsString
-          else:
-            m.spawn run cmd.multiReplace(replacements)
-        else:
-          for i in findings.low..findings.high:
-            var replacements = newSeqOfCap[(string, string)](targets.len)
-            template addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
-              needs(variable, constructor)
-              replacements.add (toReplace, variable[i])
-            addFindExeReplacements()
-            if replacements.len == 0:
-              needs(paths, mapIt(findings, it.path.string.quoteShell))
-              m.spawn run cmd & ' ' & paths[i]
-            else:
-              m.spawn run cmd.multiReplace(replacements)
-  else:
+  if exec.len == 0:
     for found in findings:
       let path = found.path.string
       if color:
@@ -146,6 +97,54 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
         stdout.write '\n'
       else:
         echo path
+  else:
+    var m = createMaster()
+    proc run(cmd: string) = discard execShellCmd(cmd)
+    m.awaitAll:
+      const targets = ["{}", "{/}", "{//}", "{/.}", "{.}"]
+      var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
+      var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
+      template needs[T](variable: var T, constructor: T) =
+        if variable.len == 0: variable = constructor
+      template addFindExeReplacements() =
+        for t in targets.low..targets.high:
+          if allIndexes[t].len > 0:
+            case t
+            of 0: addReplacement(targets[t], paths, mapIt(findings, it.path.string.quoteShell))
+            of 1: addReplacement(targets[t], filenames, mapIt(findings, it.path.lastPathPart.string))
+            of 2: addReplacement(targets[t], parentDirs, mapIt(findings, it.path.parentDir.string))
+            of 3: addReplacement(targets[t], noExtFilenames, mapIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
+            of 4: addReplacement(targets[t], noExtPaths, mapIt(findings, it.path.stripExtension.string))
+      for cmd in exec:
+        let allIndexes = cmd.findAll(targets)
+        if cmd.endsWith '+':
+          let cmd = cmd[0..^2]
+          var replacements = newSeqOfCap[(string, string)](targets.len)
+          macro addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
+            let variableString = ident($variable & "String")
+            quote do:
+              needs(`variable`, `constructor`)
+              needs(`variableString`, `variable`.join(" "))
+              replacements.add (`toReplace`, `variableString`)
+          addFindExeReplacements()
+          if replacements.len == 0:
+            needs(paths, mapIt(findings, it.path.string.quoteShell))
+            needs(pathsString, paths.join(" "))
+            m.spawn run cmd & ' ' & pathsString
+          else:
+            m.spawn run cmd.multiReplace(replacements) #TODO: Use indexes from `findAll` instead of searching again
+        else:
+          for i in findings.low..findings.high:
+            var replacements = newSeqOfCap[(string, string)](targets.len)
+            template addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
+              needs(variable, constructor)
+              replacements.add (toReplace, variable[i])
+            addFindExeReplacements()
+            if replacements.len == 0:
+              needs(paths, mapIt(findings, it.path.string.quoteShell))
+              m.spawn run cmd & ' ' & paths[i]
+            else:
+              m.spawn run cmd.multiReplace(replacements)
 
 proc f*() =
   dispatch(cliFind, cmdName = "f",
