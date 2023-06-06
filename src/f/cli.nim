@@ -120,21 +120,21 @@ proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
           # unicode chars could be an issue?
         for inCmd in exec:
           if inCmd.endsWith '+':
-            var replaceLocations = inCmd.findAll(@["{}", "{/}", "{//}", "{/.}", "{.}"])
-            var length = inCmd.len + 1
+            #TODO: Handle batching and such
+            # var replaceLocations = inCmd.findAll(@["{}", "{/}", "{//}", "{/.}", "{.}"])
+            # var length = inCmd.len + 1
 
-            var replacements = @[0]
-            var batchStart = 0
-            var batchEnd = min(inCmd.len, batchMax)
-            # while true # iterate over batchSize
+            # var replacements = @[0]
+            # var batchStart = 0
+            # var batchEnd = min(inCmd.len, batchMax)
             let inCmd = inCmd[0..^2]
-            # var cmd = inCmd.multiFindAll(("{}", pathsString),
-            #                              ("{/}", filenamesString),
-            #                              ("{//}", parentDirsString),
-            #                              ("{/.}", noExtFilenamesString),
-            #                              ("{.}", noExtPathsString))
-#            if cmd == inCmd: cmd = inCmd & ' ' & pathsString
-#            m.spawn run cmd # Seem to be hitting a command-line limit, should look into that
+            var cmd = inCmd.multiReplace(("{}", pathsString),
+                                         ("{/}", filenamesString),
+                                         ("{//}", parentDirsString),
+                                         ("{/.}", noExtFilenamesString),
+                                         ("{.}", noExtPathsString))
+            if cmd == inCmd: cmd = inCmd & ' ' & pathsString
+            m.spawn run cmd
           else:
             runCmd()
   else:
