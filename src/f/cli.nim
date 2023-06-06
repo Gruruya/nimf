@@ -46,7 +46,7 @@ template mapIt[T](collection: openArray[T], op: untyped): seq =
     result.add op
   result
 
-proc cliFind*(color = true, exec: seq[string] = @[], input: seq[string]): int =
+proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
   if input.len >= 1:
