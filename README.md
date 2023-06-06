@@ -27,4 +27,4 @@ Options:
 ---
 [![GitHub CI](../../actions/workflows/build.yml/badge.svg?branch=master)](../../actions/workflows/build.yml)
 [![Minimum supported Nim version](https://img.shields.io/badge/Nim-1.9.3+-informational?logo=Nim&labelColor=232733&color=F3D400)](https://nim-lang.org)
-[![License](https://img.shields.io/github/license/Gruruya/nimf?logo=GNU&logoColor=000000&labelColor=FFFFFF&color=663366)](LICENSE.md)
+[![License](https://img.shields.io/github/license/Gruruya/nimf?logoColor=000000&logo=GNU&labelColor=FFFFFF&color=663366)](LICENSE.md)
