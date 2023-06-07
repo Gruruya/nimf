@@ -56,30 +56,30 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
       proc alreadyAdded(arg: string): bool =
         anyIt(cast[seq[string]](paths), arg.isChildOf(it))
       if '/' in arg:
-        if dirExists(arg) or fileExists(arg):
-          if not arg.alreadyAdded:
-            paths.add Path(arg)
-        else:
-          let g =
-            if '*' in arg: arg
-            elif arg.len == 1: "/"
-            else:
-              let sepPos = arg.rfind('/', last = arg.high - 1)
-              if arg[^1] == '/':
-                if sepPos != -1:
-                  arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
-                else: '*' & arg[0..^2] & "*/"
+        block isPath:
+          if dirExists(arg) or fileExists(arg):
+            if not arg.alreadyAdded:
+              paths.add Path(arg)
+          else:
+            let g =
+              if '*' in arg: arg
+              elif arg.len == 1: "/"
               else:
-                if sepPos != -1:
+                let sepPos = arg.rfind('/', last = arg.high - 1)
+                if sepPos == -1:
+                  break isPath
+                if arg[^1] == '/':
+                  arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
+                else:
                   arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
-                else: '*' & arg[0..^1] & '*'
-          var matched = false
-          for path in walkPattern(g):
-            matched = true
-            if not path.alreadyAdded:
-              paths.add Path(path)
-          if not matched: return
-      elif '*' in arg:
+            var matched = false
+            for path in walkPattern(g):
+              matched = true
+              if not path.alreadyAdded:
+                paths.add Path(path)
+            if not matched: return
+          continue
+      if '*' in arg:
         for pattern in arg.split('*'):
           if pattern.len > 0: patterns.add pattern
       elif not arg.alreadyAdded and (dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir()):
@@ -92,7 +92,12 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
     echo patterns
     echo repr paths
 
-  let findings = findFiles(paths, patterns)
+  let kinds =
+    if patterns[^1][^1] == '/':
+      patterns = patterns[0..^2] & patterns[^1][0..^2]
+      {pcDir, pcLinkToDir}
+    else: {pcFile, pcLinkToFile}
+  let findings = findFiles(paths, patterns, kinds = kinds)
   if exec.len == 0:
     for found in findings:
       let path = found.path.string

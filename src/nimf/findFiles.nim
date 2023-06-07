@@ -32,29 +32,26 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
-proc stripDot*(s: string): string =
-  if s.len > 2 and s[0..1] == "./": s[2..^1]
-  else: s
-
-proc stripDot*(p: Path): Path =
+proc stripDot(p: Path): Path =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], match = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}) {.inline, gcsafe.} =
+proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.inline, gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
     if descendent.kind == pcDir:
-      let found = descendent.path.lastPathPart.find(patterns)
       let path =
         if absolute or dir.string in [".", "./"]: Path(descendent.path & '/')
         else: dir / Path(descendent.path & '/')
-      if pcDir in match and found.len > 0:
-       {.gcsafe.}:
-         acquire(findings.lock)
-         findings.found.add Found(path: path, kind: pcDir, matches: found)
-         release(findings.lock)
-      m.spawn findDirRec(m, path, patterns)
-    elif descendent.kind in match:
+      if pcDir in kinds:
+        let found = descendent.path.lastPathPart.find(patterns)
+        if found.len > 0:
+          {.gcsafe.}:
+            acquire(findings.lock)
+            findings.found.add Found(path: path, kind: pcDir, matches: found)
+            release(findings.lock)
+      m.spawn findDirRec(m, path, patterns, kinds)
+    elif descendent.kind in kinds:
       let found = descendent.path.lastPathPart.find(patterns)
       if found.len > 0:
         let path =
@@ -65,14 +62,14 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], match =
           findings.found.add Found(path: path, kind: descendent.kind, matches: found)
           release(findings.lock)
 
-proc findFiles*(paths: openArray[Path], patterns: openArray[string], match = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}): seq[Found] =
+proc findFiles*(paths: openArray[Path], patterns: openArray[string], kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(cast[string](path))
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, match)
-      elif info.kind in match:
+        m.spawn findDirRec(getHandle m, path, patterns, kinds)
+      elif info.kind in kinds:
         let found = path.string.lastPathPart.find(patterns)
         if found.len > 0:
           result.add Found(path: path.stripDot, kind: pcFile, matches: found)
