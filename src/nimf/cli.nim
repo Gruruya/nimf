@@ -119,8 +119,8 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
             of toPaths: addReplacement($t, paths, mapIt(findings, it.path.string.quoteShell))
             of toFilenames: addReplacement($t, filenames, mapIt(findings, it.path.lastPathPart.string))
             of toParentDirs: addReplacement($t, parentDirs, mapIt(findings, it.path.parentDir.string))
-            of toNoExtFilenames: addReplacement($t, noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
             of toNoExtPaths: addReplacement($t, noExtPaths, mapIt(findings, it.path.stripExtension.string))
+            of toNoExtFilenames: addReplacement($t, noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
       for cmd in exec:
         let allIndexes = cmd.findAll(Targets.mapIt($it))
         if cmd.endsWith '+':
