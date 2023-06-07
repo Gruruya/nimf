@@ -17,11 +17,12 @@
 
 ## CLI for finding files
 
-import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, options, macros]
+import ./[find, findFiles], pkg/[cligen, cligen/argcvt, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
 from std/strutils import startsWith, endsWith, multiReplace, rfind
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
+from std/strutils import toLowerAscii
 export cligen
 
 proc isChildOf(path, potParent: string): bool =
@@ -46,6 +47,25 @@ template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   for i {.inject.}, it {.inject.} in collection:
     result.add op
   result
+
+# `options.Option` but also stores the input so we can negate flags without values like `-c`
+type Flag[T] = object
+  val: T
+  has: bool
+  input*: string
+proc some[T](val: sink T): Flag[T] {.inline.} =
+  result.has = true
+  result.val = val
+proc none[T](val: sink T): Flag[T] {.inline.} =
+  result.has = false
+  result.val = val
+proc none(T: typedesc): Flag[T] {.inline.} = discard
+proc none[T]: Flag[T] {.inline.} = none(T)
+proc isSome[T](self: Flag[T]): bool {.inline.} = self.has
+proc isNone[T](self: Flag[T]): bool {.inline.} = not self.has
+proc unsafeGet[T](self: Flag[T]): lent T {.inline.}=
+  assert self.isSome
+  result = self.val
 
 proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): int =
   var patterns: seq[string]
@@ -88,9 +108,6 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         patterns.add arg
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
-  when defined(debug):
-    echo patterns
-    echo repr paths
 
   let kinds =
     if patterns[^1][^1] == '/':
@@ -101,8 +118,9 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
   if exec.len == 0:
     for found in findings:
       let path = found.path.string
-      if color.isNone and stdout.isatty and getEnv("NO_COLOR").len == 0 or
-      color.isSome and color.unsafeGet:
+      let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
+      if color.isNone and envColorEnabled or
+      color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet):
         let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
         stdout.setForegroundColor(fgBlue)
         stdout.setStyle({styleBright})
@@ -178,15 +196,15 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
             else:
               m.spawn run cmd.multiReplace(replacements)
 
-# Option[T] helpdoc
-# taken from c-blake "https://github.com/c-blake/cligen/issues/212#issuecomment-1167777874"
-import pkg/[cligen/argcvt]
-proc argParse[T](dst: var Option[T], dfl: Option[T], a: var ArgcvtParams): bool =
+# Special argument parsing
+proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
     var uw: T # An unwrapped value
-    if argParse(uw, (if dfl.isSome: dfl.get else: uw), a):
-      dst = option(uw); return true
-proc argHelp*[T](dfl: Option[T]; a: var ArgcvtParams): seq[string] =
-  result = @[ a.argKeys, $T, (if dfl.isSome: $dfl.get else: "?")]
+    if argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a):
+      dst = some uw; result = true
+    else: result = false
+    dst.input = a.val
+proc argHelp*[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
+  result = @[ a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
 
 proc f*() =
   dispatch(cliFind, cmdName = "f",
