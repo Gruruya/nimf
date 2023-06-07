@@ -56,8 +56,9 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
       proc alreadyAdded(arg: string): bool =
         anyIt(cast[seq[string]](paths), arg.isChildOf(it))
       if '/' in arg:
-        if not arg.alreadyAdded and (dirExists(arg) or fileExists(arg)):
-          paths.add Path(arg)
+        if dirExists(arg) or fileExists(arg):
+          if not arg.alreadyAdded:
+            paths.add Path(arg)
         else:
           for path in walkPattern(if '*' in arg: arg else: arg & '*'):
             if not path.alreadyAdded:
