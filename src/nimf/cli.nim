@@ -144,10 +144,10 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
           if allIndexes[ord(t)].len > 0:
             case t
             of toPaths: addReplacement($t, paths, mapIt(findings, it.path.string.quoteShell))
-            of toFilenames: addReplacement($t, filenames, mapIt(findings, it.path.lastPathPart.string))
-            of toParentDirs: addReplacement($t, parentDirs, mapIt(findings, it.path.parentDir.string))
-            of toNoExtPaths: addReplacement($t, noExtPaths, mapIt(findings, it.path.stripExtension.string))
-            of toNoExtFilenames: addReplacement($t, noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
+            of toFilenames: addReplacement($t, filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell))
+            of toParentDirs: addReplacement($t, parentDirs, mapIt(findings, it.path.parentDir.string.quoteShell))
+            of toNoExtPaths: addReplacement($t, noExtPaths, mapIt(findings, it.path.stripExtension.string.quoteShell))
+            of toNoExtFilenames: addReplacement($t, noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames[i] else: it.path.splitFile[1].string.quoteShell))
       for cmd in exec:
         let allIndexes = cmd.findAll(Targets.mapIt($it))
         if cmd.endsWith '+':
