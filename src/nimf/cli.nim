@@ -146,7 +146,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
     var m = createMaster()
     proc run(cmd: string) = discard execShellCmd(cmd)
     m.awaitAll:
-      type Targets = enum
+      type Target = enum
         toPaths = "{}",
         toFilenames = "{/}",
         toParentDirs = "{//}",
@@ -156,43 +156,40 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
       var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
       template needs[T](variable: var T, constructor: T) =
         if variable.len == 0: variable = constructor
-      template addFindExeReplacements() =
-        for t in Targets:
-          if allIndexes[ord(t)].len > 0:
-            case t
-            of toPaths: addReplacement($t, paths, mapIt(findings, it.path.string.quoteShell))
-            of toFilenames: addReplacement($t, filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell))
-            of toParentDirs: addReplacement($t, parentDirs, mapIt(findings, it.path.parentDir.string.quoteShell))
-            of toNoExtPaths: addReplacement($t, noExtPaths, mapIt(findings, it.path.stripExtension.string.quoteShell))
-            of toNoExtFilenames: addReplacement($t, noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames[i] else: it.path.splitFile[1].string.quoteShell))
+      proc getReplacement(t: Target; findings: seq[Found]): seq[string] =
+        case t
+        of toPaths: needs(paths, mapIt(findings, it.path.string.quoteShell)); paths 
+        of toFilenames: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames
+        of toParentDirs: needs(parentDirs, mapIt(findings, it.path.parentDir.string.quoteShell)); parentDirs
+        of toNoExtPaths: needs(noExtPaths, mapIt(findings, it.path.stripExtension.string.quoteShell)); noExtPaths
+        of toNoExtFilenames: needs(noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames[i] else: it.path.splitFile[1].string.quoteShell)); noExtFilenames
+      proc getReplacementJoined(t: Target; findings: seq[Found]): string =
+        case t
+        of toPaths: needs(pathsString, getReplacement(t, findings).join(" ")); pathsString
+        of toFilenames: needs(filenamesString, getReplacement(t, findings).join(" ")); filenamesString
+        of toParentDirs: needs(parentDirsString, getReplacement(t, findings).join(" ")); parentDirsString
+        of toNoExtPaths: needs(noExtPathsString, getReplacement(t, findings).join(" ")); noExtPathsString
+        of toNoExtFilenames: needs(noExtFilenamesString, getReplacement(t, findings).join(" ")); noExtFilenamesString
       for cmd in exec:
-        let allIndexes = cmd.findAll(Targets.mapIt($it))
+        let allIndexes = cmd.findAll(Target.mapIt($it))
         if cmd.endsWith '+':
           let cmd = cmd[0..^2]
-          var replacements = newSeqOfCap[(string, string)](Targets.enumLen)
-          macro addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
-            let variableString = ident($variable & "String")
-            quote do:
-              needs(`variable`, `constructor`)
-              needs(`variableString`, `variable`.join(" "))
-              replacements.add (`toReplace`, `variableString`)
-          addFindExeReplacements()
+          var replacements = newSeq[(string, string)]()
+          for t in Target:
+            if allIndexes[ord(t)].len > 0:
+              replacements.add ($t, getReplacementJoined(t, findings))
           if replacements.len == 0:
-            needs(paths, mapIt(findings, it.path.string.quoteShell))
-            needs(pathsString, paths.join(" "))
-            m.spawn run cmd & ' ' & pathsString
+            m.spawn run cmd & ' ' & getReplacementJoined(toPaths, findings)
           else:
             m.spawn run cmd.multiReplace(replacements) #TODO: Use indexes from `findAll` instead of searching again
         else:
           for i in findings.low..findings.high:
-            var replacements = newSeqOfCap[(string, string)](Targets.enumLen)
-            template addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
-              needs(variable, constructor)
-              replacements.add (toReplace, variable[i])
-            addFindExeReplacements()
+            var replacements = newSeqOfCap[(string, string)](Target.enumLen)
+            for t in Target:
+              if allIndexes[ord(t)].len > 0:
+                replacements.add ($t, getReplacement(t, findings)[i])
             if replacements.len == 0:
-              needs(paths, mapIt(findings, it.path.string.quoteShell))
-              m.spawn run cmd & ' ' & paths[i]
+              m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
             else:
               m.spawn run cmd.multiReplace(replacements)
 
