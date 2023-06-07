@@ -203,11 +203,15 @@ proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
       dst = some uw; result = true
     else: result = false
     dst.input = a.val
-proc argHelp*[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
+proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
   result = @[ a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
 
 proc f*() =
   dispatch(cliFind, cmdName = "f",
+                    usage = "$command $args\n\n" &
+                            "Entered `input` may be a pattern, or a path/path glob to search.\n" &
+                            "Append `/` to the end of your pattern to search for directories.\n" &
+                            "\nOptions:\n$options",
                     short = {"exec": 'x'},
                     help = {"exec": "Execute a command for each matching search result in parallel.\n" &
                                     "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
