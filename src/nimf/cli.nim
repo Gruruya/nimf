@@ -62,7 +62,7 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
           for path in walkPattern(if '*' in arg: arg else: arg & '*'):
             if not path.alreadyAdded:
               paths.add Path(path)
-      elif (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and ((absolutePath(Path(arg)) != getCurrentDir() and dirExists(arg)) or (absolutePath(Path(arg)).parentDir != getCurrentDir() and fileExists(arg)))):
+      elif (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and (dirExists(arg)) or (absolutePath(Path(arg)).parentDir != getCurrentDir() and fileExists(arg))):
         paths.add Path(arg)
       else:
         patterns &= arg.split(' ')
