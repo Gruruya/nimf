@@ -92,7 +92,7 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
     echo patterns
     echo repr paths
 
-  let findings = find(paths, patterns)
+  let findings = findFiles(paths, patterns)
   if exec.len == 0:
     for found in findings:
       let path = found.path.string

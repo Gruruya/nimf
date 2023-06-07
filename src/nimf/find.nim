@@ -55,7 +55,7 @@ template find*(text, pattern: string, start = 0): int =
   ## Patterns must match in order
   findOA(text, pattern, start)
 
-func find*(text: openArray[char], patterns: seq[string]): seq[int] =
+func findOA*(text: openArray[char], patterns: openArray[string]): seq[int] =
   ## Patterns must match in order
   var sensitive = false
   block smartCase:
@@ -75,6 +75,9 @@ func find*(text: openArray[char], patterns: seq[string]): seq[int] =
     if where == -1: return @[]
     result.add where
     start = where + pattern.len
+
+template find*(text: string, patterns: openArray[string]): seq[int] =
+  findOA(text, patterns)
 
 func continuesWithB(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant

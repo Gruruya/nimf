@@ -18,7 +18,6 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks], pkg/malebolgia
-from std/strutils import startsWith
 export Path, parentDir, lastPathPart, PathComponent
 
 type
@@ -41,11 +40,21 @@ proc stripDot*(p: Path): Path =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcsafe.} =
+proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], match = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}) {.inline, gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
-    case descendent.kind
-    of pcFile, pcLinkToFile, pcLinkToDir:
+    if descendent.kind == pcDir:
+      let found = descendent.path.lastPathPart.find(patterns)
+      let path =
+        if absolute or dir.string in [".", "./"]: Path(descendent.path & '/')
+        else: dir / Path(descendent.path & '/')
+      if pcDir in match and found.len > 0:
+       {.gcsafe.}:
+         acquire(findings.lock)
+         findings.found.add Found(path: path, kind: pcDir, matches: found)
+         release(findings.lock)
+      m.spawn findDirRec(m, path, patterns)
+    elif descendent.kind in match:
       let found = descendent.path.lastPathPart.find(patterns)
       if found.len > 0:
         let path =
@@ -55,30 +64,16 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: seq[string]) {.inline, gcs
           acquire(findings.lock)
           findings.found.add Found(path: path, kind: descendent.kind, matches: found)
           release(findings.lock)
-    of pcDir:
-      let found = descendent.path.lastPathPart.find(patterns)
-      let path =
-        if absolute or dir.string in [".", "./"]: Path(descendent.path & '/')
-        else: dir / Path(descendent.path & '/')
-      if found.len > 0:
-       {.gcsafe.}:
-         acquire(findings.lock)
-         findings.found.add Found(path: path, kind: pcDir, matches: found)
-         release(findings.lock)
-      m.spawn findDirRec(m, path, patterns)
-    else:
-      discard
 
-proc find*(paths: openArray[Path], patterns: seq[string]): seq[Found] =
+proc findFiles*(paths: openArray[Path], patterns: openArray[string], match = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(cast[string](path))
-      case info.kind
-      of pcFile, pcLinkToFile, pcLinkToDir:
+      if info.kind == pcDir:
+        m.spawn findDirRec(getHandle m, path, patterns, match)
+      elif info.kind in match:
         let found = path.string.lastPathPart.find(patterns)
         if found.len > 0:
           result.add Found(path: path.stripDot, kind: pcFile, matches: found)
-      of pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns)
   result &= findings.found
