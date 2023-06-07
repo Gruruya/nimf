@@ -19,8 +19,9 @@
 
 import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace, dedent
-from std/sequtils import anyIt
+from std/strutils import startsWith, endsWith, multiReplace
+from std/sequtils import anyIt, mapIt
+from std/typetraits import enumLen
 export cligen
 
 proc isChildOf(path, potParent: string): bool =
@@ -36,7 +37,7 @@ proc stripExtension(path: Path): Path =
   let (dir, name, _) = path.splitFile
   dir / name
 
-template mapIt[T](collection: openArray[T], op: untyped): seq =
+template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
     var i{.inject, used.}: int;
     var it{.inject.}: typeof(items(collection), typeOfIter);
@@ -101,25 +102,30 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
     var m = createMaster()
     proc run(cmd: string) = discard execShellCmd(cmd)
     m.awaitAll:
-      const targets = ["{}", "{/}", "{//}", "{/.}", "{.}"]
+      type Targets = enum
+        toPaths = "{}",
+        toFilenames = "{/}",
+        toParentDirs = "{//}",
+        toNoExtPaths = "{.}",
+        toNoExtFilenames = "{/.}"
       var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
       var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
       template needs[T](variable: var T, constructor: T) =
         if variable.len == 0: variable = constructor
       template addFindExeReplacements() =
-        for t in targets.low..targets.high:
-          if allIndexes[t].len > 0:
+        for t in Targets:
+          if allIndexes[ord(t)].len > 0:
             case t
-            of 0: addReplacement(targets[t], paths, mapIt(findings, it.path.string.quoteShell))
-            of 1: addReplacement(targets[t], filenames, mapIt(findings, it.path.lastPathPart.string))
-            of 2: addReplacement(targets[t], parentDirs, mapIt(findings, it.path.parentDir.string))
-            of 3: addReplacement(targets[t], noExtFilenames, mapIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
-            of 4: addReplacement(targets[t], noExtPaths, mapIt(findings, it.path.stripExtension.string))
+            of toPaths: addReplacement($t, paths, mapIt(findings, it.path.string.quoteShell))
+            of toFilenames: addReplacement($t, filenames, mapIt(findings, it.path.lastPathPart.string))
+            of toParentDirs: addReplacement($t, parentDirs, mapIt(findings, it.path.parentDir.string))
+            of toNoExtFilenames: addReplacement($t, noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string)); filenames[i] else: it.path.splitFile[1].string))
+            of toNoExtPaths: addReplacement($t, noExtPaths, mapIt(findings, it.path.stripExtension.string))
       for cmd in exec:
-        let allIndexes = cmd.findAll(targets)
+        let allIndexes = cmd.findAll(Targets.mapIt($it))
         if cmd.endsWith '+':
           let cmd = cmd[0..^2]
-          var replacements = newSeqOfCap[(string, string)](targets.len)
+          var replacements = newSeqOfCap[(string, string)](Targets.enumLen)
           macro addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
             let variableString = ident($variable & "String")
             quote do:
@@ -135,7 +141,7 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
             m.spawn run cmd.multiReplace(replacements) #TODO: Use indexes from `findAll` instead of searching again
         else:
           for i in findings.low..findings.high:
-            var replacements = newSeqOfCap[(string, string)](targets.len)
+            var replacements = newSeqOfCap[(string, string)](Targets.enumLen)
             template addReplacement[T](toReplace: T, variable: var openArray[T], constructor: openArray[T]) =
               needs(variable, constructor)
               replacements.add (toReplace, variable[i])
