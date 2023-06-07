@@ -152,24 +152,21 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         toParentDirs = "{//}",
         toNoExtPaths = "{.}",
         toNoExtFilenames = "{/.}"
-      var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
-      var pathsJoined, filenamesJoined, parentDirsJoined, noExtFilenamesJoined, noExtPathsJoined = ""
-      template needs[T](variable: var T, constructor: T) =
+      var replacementsStored: array[Target, seq[string]]
+      var replacementsJoinedStored: array[Target, string]
+      template needs[T](variable: var T, constructor: T): untyped =
         if variable.len == 0: variable = constructor
+        variable
       proc getReplacement(t: Target; findings: seq[Found]): seq[string] =
-        case t
-        of toPaths: needs(paths, mapIt(findings, it.path.string.quoteShell)); paths 
-        of toFilenames: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames
-        of toParentDirs: needs(parentDirs, mapIt(findings, it.path.parentDir.string.quoteShell)); parentDirs
-        of toNoExtPaths: needs(noExtPaths, mapIt(findings, it.path.stripExtension.string.quoteShell)); noExtPaths
-        of toNoExtFilenames: needs(noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames[i] else: it.path.splitFile[1].string.quoteShell)); noExtFilenames
+        needs(replacementsStored[t],
+          case t
+          of toPaths: mapIt(findings, it.path.string.quoteShell)
+          of toFilenames: mapIt(findings, it.path.lastPathPart.string.quoteShell)
+          of toParentDirs: mapIt(findings, it.path.parentDir.string.quoteShell)
+          of toNoExtPaths: mapIt(findings, it.path.stripExtension.string.quoteShell)
+          of toNoExtFilenames: mapEnumeratedIt(findings, if it.kind == pcDir: needs(replacementsStored[toFilenames], mapIt(findings, it.path.lastPathPart.string.quoteShell))[i] else: it.path.splitFile[1].string.quoteShell))
       proc getReplacementJoined(t: Target; findings: seq[Found]): string =
-        case t
-        of toPaths: needs(pathsJoined, getReplacement(t, findings).join(" ")); pathsJoined
-        of toFilenames: needs(filenamesJoined, getReplacement(t, findings).join(" ")); filenamesJoined
-        of toParentDirs: needs(parentDirsJoined, getReplacement(t, findings).join(" ")); parentDirsJoined
-        of toNoExtPaths: needs(noExtPathsJoined, getReplacement(t, findings).join(" ")); noExtPathsJoined
-        of toNoExtFilenames: needs(noExtFilenamesJoined, getReplacement(t, findings).join(" ")); noExtFilenamesJoined
+        needs(replacementsJoinedStored[t], getReplacement(t, findings).join(" "))
       for cmd in exec:
         let allIndexes = cmd.findAll(Target.mapIt($it))
         if cmd.endsWith '+':
