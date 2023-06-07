@@ -19,7 +19,7 @@
 
 import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace
+from std/strutils import startsWith, endsWith, multiReplace, rfind
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 export cligen
@@ -62,8 +62,17 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
         else:
           let g =
             if '*' in arg: arg
-            elif arg[^1] == '/': '*' & arg
-            else: arg & '*'
+            elif arg.len == 1: "/"
+            else:
+              let sepPos = arg.rfind('/', last = arg.high - 1)
+              if arg[^1] == '/':
+                if sepPos != -1:
+                  arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
+                else: '*' & arg[0..^2] & "*/"
+              else:
+                if sepPos != -1:
+                  arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
+                else: '*' & arg[0..^1] & '*'
           for path in walkPattern(g):
             if not path.alreadyAdded:
               paths.add Path(path)
