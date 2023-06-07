@@ -1,4 +1,4 @@
-version     = "0.0.1"
+version     = "0.0.2"
 author      = "Gruruya"
 description = "Text finder"
 license     = "AGPL-3.0-only"
