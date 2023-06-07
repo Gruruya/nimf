@@ -73,9 +73,12 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
                 if sepPos != -1:
                   arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
                 else: '*' & arg[0..^1] & '*'
+          var matched = false
           for path in walkPattern(g):
+            matched = true
             if not path.alreadyAdded:
               paths.add Path(path)
+          if not matched: return
       elif '*' in arg:
         for pattern in arg.split('*'):
           if pattern.len > 0: patterns.add pattern
