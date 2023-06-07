@@ -17,7 +17,7 @@
 
 ## CLI for finding files
 
-import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, macros]
+import ./[find, findFiles], pkg/[cligen, malebolgia], std/[terminal, paths, options, macros]
 import std/os except getCurrentDir
 from std/strutils import startsWith, endsWith, multiReplace, rfind
 from std/sequtils import anyIt, mapIt
@@ -47,14 +47,15 @@ template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
     result.add op
   result
 
-proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
+proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
+  proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
+    anyIt(cast[seq[string]](paths), arg.isChildOf(it))
+
   if input.len > 0:
     for i in input.low..input.high:
       let arg = input[i]
-      proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
-        anyIt(cast[seq[string]](paths), arg.isChildOf(it))
       block asPath:
         if dirExists(arg) or (fileExists(arg) and (absolutePath(Path(arg)).parentDir != getCurrentDir() or '/' in arg)):
           if not paths.alreadyAdded(arg):
@@ -67,7 +68,7 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
             else:
               let sepPos = arg.rfind('/', last = arg.high - 1)
               if sepPos == -1 and i == input.high:
-                break asPath # Trailing input/ means it's a directory pattern
+                break asPath # Trailing / at the end of all input means it's a directory pattern
               if arg[^1] == '/':
                 arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
               else:
@@ -100,7 +101,8 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
   if exec.len == 0:
     for found in findings:
       let path = found.path.string
-      if color:
+      if color.isNone and stdout.isatty and getEnv("NO_COLOR").len == 0 or
+      color.isSome and color.unsafeGet:
         let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
         stdout.setForegroundColor(fgBlue)
         stdout.setStyle({styleBright})
@@ -175,6 +177,16 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
               m.spawn run cmd & ' ' & paths[i]
             else:
               m.spawn run cmd.multiReplace(replacements)
+
+# Option[T] helpdoc
+# taken from c-blake "https://github.com/c-blake/cligen/issues/212#issuecomment-1167777874"
+import pkg/[cligen/argcvt]
+proc argParse[T](dst: var Option[T], dfl: Option[T], a: var ArgcvtParams): bool =
+    var uw: T # An unwrapped value
+    if argParse(uw, (if dfl.isSome: dfl.get else: uw), a):
+      dst = option(uw); return true
+proc argHelp*[T](dfl: Option[T]; a: var ArgcvtParams): seq[string] =
+  result = @[ a.argKeys, $T, (if dfl.isSome: $dfl.get else: "?")]
 
 proc f*() =
   dispatch(cliFind, cmdName = "f",
