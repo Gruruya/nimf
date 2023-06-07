@@ -153,7 +153,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         toNoExtPaths = "{.}",
         toNoExtFilenames = "{/.}"
       var paths, filenames, parentDirs, noExtFilenames, noExtPaths = newSeq[string]()
-      var pathsString, filenamesString, parentDirsString, noExtFilenamesString, noExtPathsString = ""
+      var pathsJoined, filenamesJoined, parentDirsJoined, noExtFilenamesJoined, noExtPathsJoined = ""
       template needs[T](variable: var T, constructor: T) =
         if variable.len == 0: variable = constructor
       proc getReplacement(t: Target; findings: seq[Found]): seq[string] =
@@ -165,11 +165,11 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         of toNoExtFilenames: needs(noExtFilenames, mapEnumeratedIt(findings, if it.kind == pcDir: needs(filenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); filenames[i] else: it.path.splitFile[1].string.quoteShell)); noExtFilenames
       proc getReplacementJoined(t: Target; findings: seq[Found]): string =
         case t
-        of toPaths: needs(pathsString, getReplacement(t, findings).join(" ")); pathsString
-        of toFilenames: needs(filenamesString, getReplacement(t, findings).join(" ")); filenamesString
-        of toParentDirs: needs(parentDirsString, getReplacement(t, findings).join(" ")); parentDirsString
-        of toNoExtPaths: needs(noExtPathsString, getReplacement(t, findings).join(" ")); noExtPathsString
-        of toNoExtFilenames: needs(noExtFilenamesString, getReplacement(t, findings).join(" ")); noExtFilenamesString
+        of toPaths: needs(pathsJoined, getReplacement(t, findings).join(" ")); pathsJoined
+        of toFilenames: needs(filenamesJoined, getReplacement(t, findings).join(" ")); filenamesJoined
+        of toParentDirs: needs(parentDirsJoined, getReplacement(t, findings).join(" ")); parentDirsJoined
+        of toNoExtPaths: needs(noExtPathsJoined, getReplacement(t, findings).join(" ")); noExtPathsJoined
+        of toNoExtFilenames: needs(noExtFilenamesJoined, getReplacement(t, findings).join(" ")); noExtFilenamesJoined
       for cmd in exec:
         let allIndexes = cmd.findAll(Target.mapIt($it))
         if cmd.endsWith '+':
