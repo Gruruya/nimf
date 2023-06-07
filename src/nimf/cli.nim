@@ -58,8 +58,8 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
       if '/' in arg:
         if not arg.alreadyAdded and (dirExists(arg) or fileExists(arg)):
           paths.add Path(arg)
-        elif '*' in arg:
-          for path in walkPattern(arg):
+        else:
+          for path in walkPattern(if '*' in arg: arg else: arg & '*'):
             if not path.alreadyAdded:
               paths.add Path(path)
       elif '*' in arg:
