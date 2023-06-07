@@ -208,7 +208,7 @@ proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
 
 proc f*() =
   dispatch(cliFind, cmdName = "f",
-                    usage = "$command $args\n\n" &
+                    usage = getAppFilename().lastPathPart & " $args\n\n" &
                             "Entered `input` may be a pattern, or a path/path glob to search.\n" &
                             "Append `/` to the end of your pattern to search for directories.\n" &
                             "\nOptions:\n$options",
