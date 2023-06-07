@@ -19,10 +19,9 @@
 
 import ./[find, findFiles], pkg/[cligen, cligen/argcvt, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace, rfind
+from std/strutils import startsWith, endsWith, multiReplace, rfind, toLowerAscii
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
-from std/strutils import toLowerAscii
 export cligen
 
 proc isChildOf(path, potParent: string): bool =
@@ -59,11 +58,11 @@ proc some[T](val: sink T): Flag[T] {.inline.} =
 proc none[T](val: sink T): Flag[T] {.inline.} =
   result.has = false
   result.val = val
-proc none(T: typedesc): Flag[T] {.inline.} = discard
+proc none(T: typedesc): Flag[T] {.inline.} = Flag[T]()
 proc none[T]: Flag[T] {.inline.} = none(T)
 proc isSome[T](self: Flag[T]): bool {.inline.} = self.has
 proc isNone[T](self: Flag[T]): bool {.inline.} = not self.has
-proc unsafeGet[T](self: Flag[T]): lent T {.inline.}=
+proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
   assert self.isSome
   result = self.val
 
