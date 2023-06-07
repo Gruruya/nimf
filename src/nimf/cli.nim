@@ -55,17 +55,17 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
       let arg = input[i]
       proc alreadyAdded(arg: string): bool =
         anyIt(cast[seq[string]](paths), arg.isChildOf(it))
-      if arg.startsWith("./"):
-        if (arg.endsWith('/') and dirExists(arg)) or not arg.alreadyAdded and (dirExists(arg) or fileExists(arg)):
+      if '/' in arg:
+        if not arg.alreadyAdded and (dirExists(arg) or fileExists(arg)):
           paths.add Path(arg)
-        else:
-          for path in walkPattern(if '*' in arg: arg else: arg & '*'):
+        elif '*' in arg:
+          for path in walkPattern(arg):
             if not path.alreadyAdded:
               paths.add Path(path)
       elif '*' in arg:
         for pattern in arg.split('*'):
           if pattern.len > 0: patterns.add pattern
-      elif (arg.endsWith('/') and dirExists(arg)) or not arg.alreadyAdded and (dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir()):
+      elif not arg.alreadyAdded and (dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir()):
         paths.add Path(arg)
       else:
         patterns.add arg
