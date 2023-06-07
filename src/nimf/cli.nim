@@ -50,22 +50,25 @@ template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
 proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
-  if input.len >= 1:
-    for i in 0..input.high:
+  if input.len > 0:
+    for i in input.low..input.high:
       let arg = input[i]
       proc alreadyAdded(arg: string): bool =
         anyIt(cast[seq[string]](paths), arg.isChildOf(it))
       if arg.startsWith("./"):
-        if (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and (dirExists(arg) or fileExists(arg))):
+        if (arg.endsWith('/') and dirExists(arg)) or not arg.alreadyAdded and (dirExists(arg) or fileExists(arg)):
           paths.add Path(arg)
         else:
           for path in walkPattern(if '*' in arg: arg else: arg & '*'):
             if not path.alreadyAdded:
               paths.add Path(path)
-      elif (arg.endsWith('/') and dirExists(arg)) or (not arg.alreadyAdded and (dirExists(arg)) or (absolutePath(Path(arg)).parentDir != getCurrentDir() and fileExists(arg))):
+      elif '*' in arg:
+        for pattern in arg.split('*'):
+          if pattern.len > 0: patterns.add pattern
+      elif (arg.endsWith('/') and dirExists(arg)) or not arg.alreadyAdded and (dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir()):
         paths.add Path(arg)
       else:
-        patterns &= arg.split(' ')
+        patterns.add arg
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
   when defined(debug):
