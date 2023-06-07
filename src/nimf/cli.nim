@@ -60,6 +60,8 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
           if dirExists(arg) or fileExists(arg):
             if not arg.alreadyAdded:
               paths.add Path(arg)
+            else:
+              break isPath
           else:
             let g =
               if '*' in arg: arg
