@@ -60,7 +60,11 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
           if not arg.alreadyAdded:
             paths.add Path(arg)
         else:
-          for path in walkPattern(if '*' in arg: arg else: arg & '*'):
+          let g =
+            if '*' in arg: arg
+            elif arg[^1] == '/': arg[0..^2] & "*/"
+            else: arg & '*'
+          for path in walkPattern(g):
             if not path.alreadyAdded:
               paths.add Path(path)
       elif '*' in arg:
