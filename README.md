@@ -7,21 +7,25 @@ Usage
 ```sh
 Usage:
   f [optional-params] [input: string...]
+
+Entered `input` may be a pattern OR a path/path glob to search.
+Append `/` to the end of your pattern to search for directories.
+
 Options:
-  -h, --help                    print this cligen-erated help
-  --help-syntax                 advanced: prepend,plurals,..
-  -c, --color    bool     true  set color
-  -x=, --exec=   strings  {}    Execute a command for each matching search result in parallel.
-                                Alternatively, end this argument with "+" to execute the command once with all results as arguments.
-                                Example: f .nim -x "$EDITOR"+
-                                The following placeholders are substituted before the command is executed:
-                                "{}":   path (of the current search result)
-                                "{/}":  basename
-                                "{//}": parent directory
-                                "{.}":  path without file extension
-                                "{/.}": basename without file extension
-                                Example: f .jpg -x 'convert {} {.}.png'
-                                If no placeholder is present, an implicit "{}" at the end is assumed.
+  -h, --help                  print this cligen-erated help
+  --help-syntax               advanced: prepend,plurals,..
+  -c=, --color=  bool     ?   set color
+  -x=, --exec=   strings  {}  Execute a command for each matching search result in parallel.
+                              Alternatively, end this argument with "+" to execute the command once with all results as arguments.
+                              Example: f .nim -x "$EDITOR"+
+                              The following placeholders are substituted before the command is executed:
+                              "{}":   path (of the current search result)
+                              "{/}":  basename
+                              "{//}": parent directory
+                              "{.}":  path without file extension
+                              "{/.}": basename without file extension
+                              Example: f .jpg -x 'convert {} {.}.png'
+                              If no placeholder is present, an implicit "{}" at the end is assumed.
 ```
 
 ---
