@@ -53,39 +53,36 @@ proc cliFind*(color = true, exec = newSeq[string](), input: seq[string]): int =
   if input.len > 0:
     for i in input.low..input.high:
       let arg = input[i]
-      proc alreadyAdded(arg: string): bool =
+      proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
         anyIt(cast[seq[string]](paths), arg.isChildOf(it))
-      if '/' in arg:
-        block isPath:
-          if dirExists(arg) or fileExists(arg):
-            if not arg.alreadyAdded:
-              paths.add Path(arg)
-            else:
-              break isPath
+      block asPath:
+        if dirExists(arg) or (fileExists(arg) and (absolutePath(Path(arg)).parentDir != getCurrentDir() or '/' in arg)):
+          if not paths.alreadyAdded(arg):
+            paths.add Path(arg)
           else:
-            let g =
-              if '*' in arg: arg
-              elif arg.len == 1: "/"
+            break asPath
+        elif '/' in arg:
+          let g =
+            if '*' in arg: arg
+            else:
+              let sepPos = arg.rfind('/', last = arg.high - 1)
+              if sepPos == -1 and i == input.high:
+                break asPath # Trailing input/ means it's a directory pattern
+              if arg[^1] == '/':
+                arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
               else:
-                let sepPos = arg.rfind('/', last = arg.high - 1)
-                if sepPos == -1:
-                  break isPath
-                if arg[^1] == '/':
-                  arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
-                else:
-                  arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
-            var matched = false
-            for path in walkPattern(g):
-              matched = true
-              if not path.alreadyAdded:
-                paths.add Path(path)
-            if not matched: return
-          continue
+                arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
+          var matched = false
+          for path in walkPattern(g):
+            matched = true
+            if not paths.alreadyAdded(path):
+              paths.add Path(path)
+          if not matched: return
+        else: break asPath
+        continue
       if '*' in arg:
         for pattern in arg.split('*'):
           if pattern.len > 0: patterns.add pattern
-      elif not arg.alreadyAdded and (dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir()):
-        paths.add Path(arg)
       else:
         patterns.add arg
   if patterns.len == 0: patterns = @[""]
