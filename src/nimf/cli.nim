@@ -24,31 +24,28 @@ from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 export cligen
 
-proc display(found: Found, patterns: seq[string], color: bool) {.inline.} =
+proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
-  if color:
-    var line = ""
-    let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
-    stdout.setForegroundColor(fgBlue)
-    stdout.setStyle({styleBright})
-    stdout.write parent
-    if found.kind != pcDir:
-      stdout.resetAttributes()
-    var start = parent.len
-    for i in 0..found.matches.high:
-      let colorStart = found.matches[i] + parent.len
-      let colorEnd = colorStart + patterns[i].high
-      stdout.write path[start ..< colorStart]
-      stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
-      if found.kind == pcDir:
-        stdout.setForegroundColor(fgBlue)
-        stdout.setStyle({styleBright})
-      start = colorEnd + 1
-    if start != path.len:
-      stdout.write path[start..path.high]
-    stdout.write '\n'
-  else:
-    echo path
+  var line = ""
+  let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
+  stdout.setForegroundColor(fgBlue)
+  stdout.setStyle({styleBright})
+  stdout.write parent
+  if found.kind != pcDir:
+    stdout.resetAttributes()
+  var start = parent.len
+  for i in 0..found.matches.high:
+    let colorStart = found.matches[i] + parent.len
+    let colorEnd = colorStart + patterns[i].high
+    stdout.write path[start ..< colorStart]
+    stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
+    if found.kind == pcDir:
+      stdout.setForegroundColor(fgBlue)
+      stdout.setStyle({styleBright})
+    start = colorEnd + 1
+  if start != path.len:
+    stdout.write path[start..path.high]
+  stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
   let (dir, name, _) = path.splitFile
@@ -194,7 +191,9 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
     let displayColor = color.isNone and envColorEnabled or
     color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
     for found in findings:
-      display(found, patterns, displayColor)
+      if displayColor:
+         display(found, patterns)
+      else: echo found.path.string
   else:
     run(exec, findings)
 
