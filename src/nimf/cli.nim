@@ -153,7 +153,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
     template needs[T](variable: var T, constructor: T): untyped =
       if variable.len == 0: variable = constructor
       variable
-    proc getReplacement(t: Target; findings: seq[Found]): seq[string] =
+    template getReplacement(t: Target; findings: seq[Found]): seq[string] =
       needs(replacementsStored[t],
         case t
         of toPaths: mapIt(findings, it.path.string.quoteShell)
@@ -161,7 +161,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         of toParentDirs: mapIt(findings, it.path.parentDir.string.quoteShell)
         of toNoExtPaths: mapIt(findings, it.path.stripExtension.string.quoteShell)
         of toNoExtFilenames: mapEnumeratedIt(findings, if it.kind == pcDir: needs(replacementsStored[toFilenames], mapIt(findings, it.path.lastPathPart.string.quoteShell))[i] else: it.path.splitFile[1].string.quoteShell))
-    proc getReplacementJoined(t: Target; findings: seq[Found]): string =
+    template getReplacementJoined(t: Target; findings: seq[Found]): string =
       needs(replacementsJoinedStored[t], getReplacement(t, findings).join(" "))
     proc run(cmd: string) = discard execShellCmd(cmd)
     var m = createMaster()
