@@ -160,9 +160,8 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
               if sepPos == -1 and i == input.high:
                 break asPath # Trailing / at the end of all input means it's a directory pattern
               if arg[^1] == '/':
-                arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
-              else:
-                arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
+                    arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
+              else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
           var matched = false
           for path in walkPattern(g):
             matched = true
