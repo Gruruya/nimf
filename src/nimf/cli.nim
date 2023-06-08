@@ -199,11 +199,11 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
 
 # Special argument parsing
 proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
-    var uw: T # An unwrapped value
-    if argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a):
-      dst = some uw; result = true
-    else: result = false
-    dst.input = a.val
+  var uw: T # An unwrapped value
+  if argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a):
+    dst = some uw; dst.input = a.val; true
+  else: false
+
 proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
   result = @[ a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
 
