@@ -24,48 +24,6 @@ from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 export cligen
 
-proc isChildOf(path, potParent: string): bool =
-  let aPotParent = absolutePath(Path(potParent))
-  let aPath = absolutePath(Path(path))
-  if aPath == aPotParent:
-    return true
-  for parent in aPath.parentDirs:
-    if aPotParent == parent: return true
-  result = false
-
-proc stripExtension(path: Path): Path =
-  let (dir, name, _) = path.splitFile
-  dir / name
-
-template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
-  type OutType = typeof((block:
-    var i{.inject, used.}: int;
-    var it{.inject.}: typeof(items(collection), typeOfIter);
-    op), typeOfProc)
-  var result = newSeqOfCap[OutType](collection.len)
-  for i {.inject.}, it {.inject.} in collection:
-    result.add op
-  result
-
-# `options.Option` but also stores the input so we can negate flags without values like `-c`
-type Flag[T] = object
-  val: T
-  has: bool
-  input*: string
-proc some[T](val: sink T): Flag[T] {.inline.} =
-  result.has = true
-  result.val = val
-proc none[T](val: sink T): Flag[T] {.inline.} =
-  result.has = false
-  result.val = val
-proc none(T: typedesc): Flag[T] {.inline.} = Flag[T]()
-proc none[T]: Flag[T] {.inline.} = none(T)
-proc isSome[T](self: Flag[T]): bool {.inline.} = self.has
-proc isNone[T](self: Flag[T]): bool {.inline.} = not self.has
-proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
-  assert self.isSome
-  result = self.val
-
 proc display(found: Found, patterns: seq[string], color: bool) {.inline.} =
   let path = found.path.string
   if color:
@@ -91,6 +49,20 @@ proc display(found: Found, patterns: seq[string], color: bool) {.inline.} =
     stdout.write '\n'
   else:
     echo path
+
+proc stripExtension(path: Path): Path =
+  let (dir, name, _) = path.splitFile
+  dir / name
+
+template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
+  type OutType = typeof((block:
+    var i{.inject, used.}: int;
+    var it{.inject.}: typeof(items(collection), typeOfIter);
+    op), typeOfProc)
+  var result = newSeqOfCap[OutType](collection.len)
+  for i {.inject.}, it {.inject.} in collection:
+    result.add op
+  result
 
 type Target = enum
   toPaths = "{}",
@@ -140,6 +112,34 @@ proc run(cmds: seq[string], findings: seq[Found]) =
                 m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
           else: m.spawn run cmd.multiReplace(replacements)
 
+# `options.Option` but also stores the input so we can negate flags without values like `-c`
+type Flag[T] = object
+  val: T
+  has: bool
+  input*: string
+proc some[T](val: sink T): Flag[T] {.inline.} =
+  result.has = true
+  result.val = val
+proc none[T](val: sink T): Flag[T] {.inline.} =
+  result.has = false
+  result.val = val
+proc none(T: typedesc): Flag[T] {.inline.} = Flag[T]()
+proc none[T]: Flag[T] {.inline.} = none(T)
+proc isSome[T](self: Flag[T]): bool {.inline.} = self.has
+proc isNone[T](self: Flag[T]): bool {.inline.} = not self.has
+proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
+  assert self.isSome
+  result = self.val
+
+proc isChildOf(path, potParent: string): bool =
+  let aPotParent = absolutePath(Path(potParent))
+  let aPath = absolutePath(Path(path))
+  if aPath == aPotParent:
+    return true
+  for parent in aPath.parentDirs:
+    if aPotParent == parent: return true
+  result = false
+
 proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
@@ -188,6 +188,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
       {pcDir, pcLinkToDir}
     else: {pcFile, pcLinkToFile}
   let findings = findFiles(paths, patterns, kinds = kinds)
+
   if exec.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
     let displayColor = color.isNone and envColorEnabled or
