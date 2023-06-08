@@ -32,7 +32,7 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
-proc stripDot(p: Path): Path =
+proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
