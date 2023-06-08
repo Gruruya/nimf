@@ -66,6 +66,32 @@ proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
   assert self.isSome
   result = self.val
 
+proc display(found: Found, patterns: seq[string], color: bool) {.inline.} =
+  let path = found.path.string
+  if color:
+    var line = ""
+    let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
+    stdout.setForegroundColor(fgBlue)
+    stdout.setStyle({styleBright})
+    stdout.write parent
+    if found.kind != pcDir:
+      stdout.resetAttributes()
+    var start = parent.len
+    for i in 0..found.matches.high:
+      let colorStart = found.matches[i] + parent.len
+      let colorEnd = colorStart + patterns[i].high
+      stdout.write path[start ..< colorStart]
+      stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
+      if found.kind == pcDir:
+        stdout.setForegroundColor(fgBlue)
+        stdout.setStyle({styleBright})
+      start = colorEnd + 1
+    if start != path.len:
+      stdout.write path[start..path.high]
+    stdout.write '\n'
+  else:
+    echo path
+
 proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): int =
   var patterns: seq[string]
   var paths: seq[Path]
@@ -115,32 +141,11 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
     else: {pcFile, pcLinkToFile}
   let findings = findFiles(paths, patterns, kinds = kinds)
   if exec.len == 0:
+    let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
+    let displayColor = color.isNone and envColorEnabled or
+    color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
     for found in findings:
-      let path = found.path.string
-      let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
-      if color.isNone and envColorEnabled or
-      color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet):
-        let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
-        stdout.setForegroundColor(fgBlue)
-        stdout.setStyle({styleBright})
-        stdout.write parent
-        if found.kind != pcDir:
-          stdout.resetAttributes()
-        var start = parent.len
-        for i in 0..found.matches.high:
-          let colorStart = found.matches[i] + parent.len
-          let colorEnd = colorStart + patterns[i].high
-          stdout.write path[start ..< colorStart]
-          stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
-          if found.kind == pcDir:
-            stdout.setForegroundColor(fgBlue)
-            stdout.setStyle({styleBright})
-          start = colorEnd + 1
-        if start != path.len:
-          stdout.write path[start..path.high]
-        stdout.write '\n'
-      else:
-        echo path
+      display(found, patterns, displayColor)
   else:
     type Target = enum
       toPaths = "{}",
