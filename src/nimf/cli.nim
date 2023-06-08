@@ -146,35 +146,28 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
   if input.len > 0:
     for i in input.low..input.high:
       let arg = input[i]
-      block asPath:
-        if dirExists(arg) or (fileExists(arg) and (absolutePath(Path(arg)).parentDir != getCurrentDir() or '/' in arg)):
-          if not paths.alreadyAdded(arg):
-            paths.add Path(arg)
+      if dirExists(arg) or (fileExists(arg) and (absolutePath(Path(arg)).parentDir != getCurrentDir() or '/' in arg)):
+        if not paths.alreadyAdded(arg):
+          paths.add Path(arg)
+        else:
+          patterns.add arg
+      elif '/' in arg:
+        let g =
+          if '*' in arg: arg
           else:
-            break asPath
-        elif '/' in arg:
-          let g =
-            if '*' in arg: arg
-            else:
-              let sepPos = arg.rfind('/', last = arg.high - 1)
-              if sepPos == -1 and i == input.high:
-                break asPath # Trailing / at the end of all input means it's a directory pattern
-              if arg[^1] == '/':
-                    arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
-              else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
-          var matched = false
-          for path in walkPattern(g):
-            matched = true
-            if not paths.alreadyAdded(path):
-              paths.add Path(path)
-          if not matched: return
-        else: break asPath
-        continue
-      if '*' in arg:
-        for pattern in arg.split('*'):
-          if pattern.len > 0: patterns.add pattern
-      else:
-        patterns.add arg
+            let sepPos = arg.rfind('/', last = arg.high - 1)
+            if sepPos == -1 and i == input.high:
+              patterns.add arg # Trailing / at the end of all input means it's a directory pattern
+            if arg[^1] == '/':
+                  arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
+            else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
+        var matched = false
+        for path in walkPattern(g):
+          matched = true
+          if not paths.alreadyAdded(path):
+            paths.add Path(path)
+        if not matched: return
+      else: patterns.add arg
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
