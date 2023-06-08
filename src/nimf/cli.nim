@@ -181,8 +181,8 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
 
   let kinds =
     if patterns[^1][^1] == '/':
-      patterns = patterns[0..^2] & patterns[^1][0..^2]
-      {pcDir, pcLinkToDir}
+       patterns[^1].setLen patterns[^1].len - 1
+       {pcDir, pcLinkToDir}
     else: {pcFile, pcLinkToFile}
   let findings = findFiles(paths, patterns, kinds = kinds)
 
