@@ -143,6 +143,10 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
   proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
     anyIt(cast[seq[string]](paths), arg.isChildOf(it))
 
+  template addPattern(arg: string) =
+    patterns.add arg
+    continue
+
   if input.len > 0:
     for i in input.low..input.high:
       let arg = input[i]
@@ -150,14 +154,14 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         if not paths.alreadyAdded(arg):
           paths.add Path(arg)
         else:
-          patterns.add arg
+          addPattern arg
       elif '/' in arg:
         let g =
           if '*' in arg: arg
           else:
             let sepPos = arg.rfind('/', last = arg.high - 1)
             if sepPos == -1 and i == input.high:
-              patterns.add arg # Trailing / at the end of all input means it's a directory pattern
+              addPattern arg # Trailing / at the end of all input means it's a directory pattern
             if arg[^1] == '/':
                   arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
             else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
@@ -167,7 +171,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
           if not paths.alreadyAdded(path):
             paths.add Path(path)
         if not matched: return
-      else: patterns.add arg
+      else: addPattern arg
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
