@@ -19,7 +19,7 @@
 
 import ./[find, findFiles], pkg/[cligen, cligen/argcvt, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace, rfind, toLowerAscii
+from std/strutils import endsWith, multiReplace, rfind
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 export cligen
@@ -47,8 +47,14 @@ proc display(found: Found, patterns: seq[string]) =
   stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
-  let (dir, name, _) = path.splitFile
-  dir / name
+  for i in countDown(path.string.high, path.string.low):
+    case path.string[i]
+    of '/':
+      break
+    of '.':
+      return Path(path.string[0..<i])
+    else: discard
+  result = path
 
 template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
