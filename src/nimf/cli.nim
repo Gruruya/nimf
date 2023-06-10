@@ -161,15 +161,14 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
         else:
           addPattern arg
       elif '/' in arg:
+        let sepPos = arg.rfind('/', last = arg.high - 1)
+        if sepPos == -1 and i == input.high:
+          addPattern arg # Trailing / on relative path as last arg means it's a directory pattern
         let g =
           if '*' in arg: arg
-          else:
-            let sepPos = arg.rfind('/', last = arg.high - 1)
-            if sepPos == -1 and i == input.high:
-              addPattern arg # Trailing / at the end of all input means it's a directory pattern
-            if arg[^1] == '/':
-                  arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
-            else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
+          elif arg[^1] == '/':
+                arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
+          else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
         var matched = false
         for path in walkPattern(g):
           matched = true
