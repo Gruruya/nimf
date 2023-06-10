@@ -25,7 +25,7 @@ func continuesWith(text, substr: openArray[char], start: Natural): bool =
     if text[i + start] != substr[i]: return false
   result = true
 
-func findOA*(text, pattern: openArray[char], start = 0): int =
+func find*(text, pattern: openArray[char], start = 0): int =
   for i in start..text.len - pattern.len:
     if text.continuesWith(pattern, i):
       return i
@@ -51,11 +51,7 @@ func findI*(text, pattern: openArray[char], start = 0): int =
       return i
   result = -1
 
-template find*(text, pattern: string, start = 0): int =
-  ## Patterns must match in order
-  findOA(text, pattern, start)
-
-func findOA*(text: openArray[char], patterns: openArray[string]): seq[int] =
+func find*(text: openArray[char], patterns: openArray[string], start: sink int = 0): seq[int] =
   ## Patterns must match in order
   var sensitive = false
   block smartCase:
@@ -65,24 +61,20 @@ func findOA*(text: openArray[char], patterns: openArray[string]): seq[int] =
           sensitive = true
           break smartCase
   result = newSeqOfCap[int](patterns.len)
-  var start = 0
   for pattern in patterns:
     if pattern.len == 0:
       result.add 0
       continue
     if start > text.high: return @[]
-    let where = if sensitive: text.findOA(pattern, start) else: text.findI(pattern, start)
+    let where = if sensitive: text.find(pattern, start) else: text.findI(pattern, start)
     if where == -1: return @[]
     result.add where
     start = where + pattern.len
 
-template find*(text: string, patterns: openArray[string]): seq[int] =
-  findOA(text, patterns)
-
 func continuesWithB(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant
   if substr.len + start <= text.len:
-        continuesWith(text, substr, start)
+    continuesWith(text, substr, start)
   else: false
 
 func findAll*(text, pattern: openArray[char]): seq[int] =
@@ -104,3 +96,7 @@ func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[int]]
       if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and
          text.continuesWithB(pattern, i):
            result[j].add i
+
+# Workaround for `system.find`
+template find*(text: openArray[char], pattern: string): int = find(text, pattern, 0)
+template find*(text: string, patterns: openArray[string]): seq[int] = find(text, patterns, 0)

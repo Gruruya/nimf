@@ -26,7 +26,6 @@ export cligen
 
 proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
-  var line = ""
   let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
   stdout.setForegroundColor(fgBlue)
   stdout.setStyle({styleBright})
@@ -71,7 +70,7 @@ type Target = enum
 proc run(cmds: seq[string], findings: seq[Found]) =
   var replacementsStored: array[Target, seq[string]]
   var replacementsJoinedStored: array[Target, string]
-  template needs[T](variable: var T, constructor: T): untyped =
+  template needs[T](variable: var T, constructor: T): T =
     if variable.len == 0: variable = constructor
     variable
   template getReplacement(t: Target; findings: seq[Found]): seq[string] =
@@ -180,7 +179,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
        patterns[^1].setLen patterns[^1].len - 1
        {pcDir, pcLinkToDir}
     else: {pcFile, pcLinkToFile}
-  let findings = findFiles(paths, patterns, kinds = kinds)
+  let findings = findFiles(paths, patterns, kinds)
 
   if exec.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
@@ -199,9 +198,8 @@ proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
   if argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a):
     dst = some uw; dst.input = a.val; true
   else: false
-
 proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
-  result = @[ a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
+  @[a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
 
 proc f*() =
   dispatch(cliFind, cmdName = "f",
