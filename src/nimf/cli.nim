@@ -66,16 +66,18 @@ template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
     result.add op
   result
 
-type Target = enum
-  toPaths = "{}",
-  toFilenames = "{/}",
-  toParentDirs = "{//}",
-  toNoExtPaths = "{.}",
-  toNoExtFilenames = "{/.}"
-
 proc run(cmds: seq[string], findings: seq[Found]) =
+
+  type Target = enum
+    toPaths = "{}",
+    toFilenames = "{/}",
+    toParentDirs = "{//}",
+    toNoExtPaths = "{.}",
+    toNoExtFilenames = "{/.}"
+
   var replacementsStored: array[Target, seq[string]]
   var replacementsJoinedStored: array[Target, string]
+
   template needs[T](variable: var T, constructor: T): T =
     if variable.len == 0: variable = constructor
     variable
