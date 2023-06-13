@@ -23,7 +23,7 @@
 ## To run these tests, simply execute `nimble test`.
 
 import pkg/balls
-import ./nimf
+import ../src/nimf
 
 suite "example":
   block operation:
