@@ -67,7 +67,7 @@ template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   result
 
 proc run(cmds: seq[string], findings: seq[Found]) =
-
+  ## Run the commands on the findings
   type Target = enum
     toPaths = "{}",
     toFilenames = "{/}",
@@ -191,7 +191,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
   if exec.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
     let displayColor = color.isNone and envColorEnabled or
-    color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
+                       color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
     for found in findings:
       if displayColor:
          display(found, patterns)
