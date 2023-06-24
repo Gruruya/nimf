@@ -32,9 +32,7 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
-proc stripDot(p: Path): Path {.inline.} =
-  if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
-  else: p
+proc `&`(p: Path, c: char): Path {.inline, borrow.}
 
 proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.inline, gcsafe.} =
   let absolute = isAbsolute(dir)
@@ -51,7 +49,7 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: 
         release(findings.lock)
 
     if descendent.kind == pcDir:
-      let path = Path(formatPath().string & '/')
+      let path = formatPath() & '/'
       if pcDir in kinds:
         let found = descendent.path.lastPathPart.find(patterns)
         if found.len > 0:
@@ -63,6 +61,10 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: 
       if found.len > 0:
         let path = formatPath()
         addFound()
+
+proc stripDot(p: Path): Path {.inline.} =
+  if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
+  else: p
 
 proc findFiles*(paths: openArray[Path], patterns: openArray[string], kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}): seq[Found] =
   var m = createMaster()
