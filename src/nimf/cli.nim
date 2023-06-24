@@ -139,33 +139,35 @@ proc isChildOf(path, potParent: string): bool =
   let aPotParent = absolutePath(Path(potParent))
   let aPath = absolutePath(Path(path))
   if aPath == aPotParent:
-    return true
-  for parent in aPath.parentDirs:
-    if aPotParent == parent: return true
-  result = false
+    true
+  else:
+    for parent in aPath.parentDirs:
+      if aPotParent == parent:
+        return true
+    false
 
 proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): int =
-  var patterns: seq[string]
-  var paths: seq[Path]
+
+  var patterns = newSeq[string]()
+  var paths = newSeq[Path]()
   proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
     anyIt(cast[seq[string]](paths), arg.isChildOf(it))
-
-  template addPattern(arg: string) =
-    patterns.add arg
-    continue
 
   if input.len > 0:
     for i in input.low..input.high:
       let arg = input[i]
-      if dirExists(arg) or (fileExists(arg) and (absolutePath(Path(arg)).parentDir != getCurrentDir() or '/' in arg)):
+      if dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir():
         if not paths.alreadyAdded(arg):
           paths.add Path(arg)
         else:
-          addPattern arg
+          patterns.add arg
+          continue
       elif '/' in arg:
+        # Find all matching directories, then go over pattern paths/directories
         let sepPos = arg.rfind('/', last = arg.high - 1)
         if sepPos == -1 and i == input.high:
-          addPattern arg # Trailing / on relative path as last arg means it's a directory pattern
+          patterns.add arg # Trailing / on relative path as last arg means it's a directory pattern
+          continue
         let g =
           if '*' in arg: arg
           elif arg[^1] == '/':
@@ -177,7 +179,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
           if not paths.alreadyAdded(path):
             paths.add Path(path)
         if not matched: return
-      else: addPattern arg
+      else: patterns.add arg
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
