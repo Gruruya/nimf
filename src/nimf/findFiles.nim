@@ -39,28 +39,30 @@ proc stripDot(p: Path): Path {.inline.} =
 proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.inline, gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
+
+    template formatPath(): Path =
+      if absolute or dir.string in [".", "./"]: Path(descendent.path)
+      else: dir / Path(descendent.path)
+
+    template addFound() =
+      {.gcsafe.}:
+        acquire(findings.lock)
+        findings.found.add Found(path: path, kind: descendent.kind, matches: found)
+        release(findings.lock)
+
     if descendent.kind == pcDir:
-      let path =
-        if absolute or dir.string in [".", "./"]: Path(descendent.path & '/')
-        else: dir / Path(descendent.path & '/')
+      let path = Path(formatPath().string & '/')
       if pcDir in kinds:
         let found = descendent.path.lastPathPart.find(patterns)
         if found.len > 0:
-          {.gcsafe.}:
-            acquire(findings.lock)
-            findings.found.add Found(path: path, kind: pcDir, matches: found)
-            release(findings.lock)
+          addFound()
       m.spawn findDirRec(m, path, patterns, kinds)
+
     elif descendent.kind in kinds:
       let found = descendent.path.lastPathPart.find(patterns)
       if found.len > 0:
-        let path =
-          if absolute or dir.string in [".", "./"]: Path(descendent.path)
-          else: dir / Path(descendent.path)
-        {.gcsafe.}:
-          acquire(findings.lock)
-          findings.found.add Found(path: path, kind: descendent.kind, matches: found)
-          release(findings.lock)
+        let path = formatPath()
+        addFound()
 
 proc findFiles*(paths: openArray[Path], patterns: openArray[string], kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}): seq[Found] =
   var m = createMaster()
