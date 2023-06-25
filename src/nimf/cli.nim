@@ -29,7 +29,7 @@ proc display(found: Found, patterns: seq[string]) =
   var parentLen = path.rfind('/')
   if parentLen == path.high and path.len > 1: parentLen = path.rfind('/', parentLen - 1)
   var start = 0
-  if found.matches == @[0]:
+  if patterns == @[""]:
     stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
     stdout.write path[parentLen + 1..^1]
   else:
