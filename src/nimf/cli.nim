@@ -19,7 +19,7 @@
 
 import ./[find, findFiles], pkg/[cligen, cligen/argcvt, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import endsWith, multiReplace, rfind
+from std/strutils import startsWith, endsWith, multiReplace, rfind
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 export cligen
@@ -27,23 +27,27 @@ export cligen
 proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
   let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
-  stdout.setForegroundColor(fgBlue)
-  stdout.setStyle({styleBright})
-  stdout.write parent
-  if found.kind != pcDir:
-    stdout.resetAttributes()
-  var start = parent.len
+  var start = 0
   for i in 0..found.matches.high:
-    let colorStart = found.matches[i] + parent.len
-    let colorEnd = colorStart + patterns[i].high
-    stdout.write path[start ..< colorStart]
-    stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
-    if found.kind == pcDir:
+    if start < parent.len or found.kind == pcDir:
       stdout.setForegroundColor(fgBlue)
       stdout.setStyle({styleBright})
+    let colorStart = found.matches[i]
+    let colorEnd = colorStart + patterns[i].high
+    if start < parent.len and colorStart >= parent.len:
+      stdout.write path[start ..< parent.len]
+      if found.kind != pcDir:
+        stdout.resetAttributes()
+      stdout.write path[parent.len ..< colorStart]
+    else:
+      stdout.write path[start ..< colorStart]
+    stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
     start = colorEnd + 1
   if start != path.len:
-    stdout.write path[start..path.high]
+    if found.kind != pcDir:
+      stdout.write path[start..path.high]
+    else:
+      stdout.styledWrite styleBright, fgBlue, path[start..path.high]
   stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
@@ -156,39 +160,14 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
   if input.len > 0:
     for i in input.low..input.high:
       let arg = input[i]
-      if dirExists(arg) or fileExists(arg) and absolutePath(Path(arg)).parentDir != getCurrentDir():
-        if not paths.alreadyAdded(arg):
-          paths.add Path(arg)
-        else:
-          patterns.add arg
-          continue
-      elif '/' in arg:
-        # Find all matching directories, then go over pattern paths/directories
-        let sepPos = arg.rfind('/', last = arg.high - 1)
-        if sepPos == -1 and i == input.high:
-          patterns.add arg # Trailing / on relative path as last arg means it's a directory pattern
-          continue
-        let g =
-          if '*' in arg: arg
-          elif arg[^1] == '/':
-                arg[0..sepPos] & '*' & arg[sepPos + 1..^2] & "*/"
-          else: arg[0..sepPos] & '*' & arg[sepPos + 1..^1] & '*'
-        var matched = false
-        for path in walkPattern(g):
-          matched = true
-          if not paths.alreadyAdded(path):
-            paths.add Path(path)
-        if not matched: return
-      else: patterns.add arg
+      if arg != "/" and (dirExists(arg) or fileExists(arg) and (arg.startsWith("./") or absolutePath(Path(arg)).parentDir != getCurrentDir())) and not paths.alreadyAdded(arg):
+        paths.add Path(arg)
+      else:
+        patterns.add arg
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
-  let kinds =
-    if patterns[^1][^1] == '/':
-       patterns[^1].setLen patterns[^1].len - 1
-       {pcDir, pcLinkToDir}
-    else: {pcFile, pcLinkToFile}
-  let findings = findFiles(paths, patterns, kinds)
+  let findings = traverseFind(paths, patterns)
 
   if exec.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0

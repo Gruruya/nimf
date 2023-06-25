@@ -19,17 +19,35 @@
 
 {.push inline, checks: off.}
 
-func continuesWith(text, substr: openArray[char], start: Natural): bool =
+func continuesWith*(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`
   for i in substr.low..substr.high:
     if text[i + start] != substr[i]: return false
   result = true
 
-func find*(text, pattern: openArray[char], start = 0): int =
-  for i in start..text.len - pattern.len:
+func find*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+  for i in start..last:
     if text.continuesWith(pattern, i):
       return i
   result = -1
+
+func find*(text, pattern: openArray[char], start = 0.Natural): int =
+  text.find(pattern, start, text.len - pattern.len)
+
+func preceedsWith(text, substr: openArray[char], last: Natural): bool =
+  ## Checks if `substr` is in `text` backwards, ending at `last`
+  for i in countdown(substr.high, substr.low):
+    if text[i + last] != substr[i]: return false
+  result = true
+
+func rfind*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+  for i in countdown(last, start):
+    if text.preceedsWith(pattern, i):
+      return i
+  result = -1
+
+func rfind*(text, pattern: openArray[char], start = 0.Natural): int =
+  text.rfind(pattern, start, text.len - pattern.len)
 
 func toLowerAscii(c: char): char =
   if c in {'A'..'Z'}:
@@ -45,28 +63,35 @@ func continuesWith(text, substr: openArray[char], start: Natural, cmp: proc): bo
     if not cmp(text[i + start], substr[i]): return false
   result = true
 
-func findI*(text, pattern: openArray[char], start = 0): int =
-  for i in start..text.len - pattern.len:
+func findI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+  for i in start..last:
     if text.continuesWith(pattern, i, cmpInsensitive):
       return i
   result = -1
 
-func find*(text: openArray[char], patterns: openArray[string], start: sink int = 0): seq[int] =
+func findI*(text, pattern: openArray[char], start = 0.Natural): int =
+  text.findI(pattern, start, text.len - pattern.len)
+
+func containsAny(strings: openArray[string], chars: set[char]): bool {.inline.} =
+  for string in strings:
+    for c in string:
+      if c in chars: return true
+  result = false
+
+func find*(text: openArray[char], patterns: openArray[string], start: sink Natural = 0, last: sink int = -1): seq[int] =
   ## Patterns must match in order
-  var sensitive = false
-  block smartCase:
-    for s in patterns:
-      for c in s:
-        if c in {'A'..'Z'}:
-          sensitive = true
-          break smartCase
   result = newSeqOfCap[int](patterns.len)
+  let sensitive = patterns.containsAny({'A'..'Z'})
   for pattern in patterns:
     if pattern.len == 0:
       result.add 0
       continue
     if start > text.high: return @[]
-    let where = if sensitive: text.find(pattern, start) else: text.findI(pattern, start)
+
+    if last == -1: last = text.len - pattern.len
+    let where = if sensitive: text.find(pattern, start, last)
+                        else: text.findI(pattern, start, last)
+
     if where == -1: return @[]
     result.add where
     start = where + pattern.len

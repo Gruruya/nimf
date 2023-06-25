@@ -17,8 +17,10 @@
 
 ## File path finding
 
-import ./find, std/[os, paths, locks], pkg/malebolgia
+import ./find, std/[os, paths, locks, sugar], pkg/malebolgia
 export Path
+
+{.push inline.}
 
 type
   Found* = object
@@ -32,9 +34,61 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
-proc `&`(p: Path, c: char): Path {.inline, borrow.}
+proc `&`(p: Path, c: char): Path {.borrow.}
 
-proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.inline, gcsafe.} =
+proc contains(strings: openArray[string], c: char): bool =
+  for s in strings:
+    if c in s: return true
+  result = false
+
+func findBefore(text, pattern: openArray[char], start = 0.Natural, last: Natural, blacklist: set[char]): int =
+  ## Finds text in a path before any character in `blacklist`
+  for i in start..last:
+    if text.continuesWith(pattern, i):
+      return i
+    elif text[i] in blacklist: break
+  result = -1
+
+func findBefore(text, pattern: openArray[char], start = 0.Natural, blacklist: set[char]): int =
+  text.findBefore(pattern, start, text.len - pattern.len, blacklist)
+
+{.pop.}
+
+proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
+  ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
+  if patterns.len == 0: return @[]
+  if patterns.len == 1 and patterns[0].len == 0: return @[0]
+
+  var lastPatternSlash =
+    block body:
+      var result = -1
+      for i in countdown(patterns.high, patterns.low):
+        if '/' in patterns[i].string: result = i; break
+      result
+  var lastPathSlash = path.string.rfind("/")
+  if lastPathSlash == path.string.high and path.string.len > 1: # Skip trailing '/'
+    lastPathSlash = path.string.rfind("/", path.string.high - 1)
+
+  result = newSeqOfCap[int](patterns.len)
+  var start = 0
+  var lastPathPart = false
+  var betweenDirMatch = false
+  for i in 0..patterns.high:
+    if patterns[i].len == 0:
+      result.add start
+    else:
+      if i > lastPatternSlash or lastPathPart:
+        start = lastPathSlash + 1
+        lastPathPart = true
+      if start > path.string.high: return @[]
+      result.add if not betweenDirMatch: path.string.find(patterns[i], start)
+                 else: path.string.findBefore(patterns[i], start, blacklist = {'/'})
+      if result[i] == -1: return @[]
+      betweenDirMatch = not lastPathPart and not (patterns[i][^1] == '/')
+      if not lastPathPart:
+        start = result[i] + patterns[i].len
+
+proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
 
@@ -51,13 +105,15 @@ proc findDirRec(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: 
     if descendent.kind == pcDir:
       let path = formatPath() & '/'
       if pcDir in kinds:
-        let found = descendent.path.lastPathPart.find(patterns)
+        let absPath = if absolute: Path(descendent.path) else: dir / Path(descendent.path)
+        let found = absPath.findPath(patterns)
         if found.len > 0:
           addFound()
-      m.spawn findDirRec(m, path, patterns, kinds)
+      m.spawn traverseFindDir(m, path, patterns, kinds)
 
     elif descendent.kind in kinds:
-      let found = descendent.path.lastPathPart.find(patterns)
+      let absPath = if absolute: Path(descendent.path) else: dir / Path(descendent.path)
+      let found = absPath.findPath(patterns)
       if found.len > 0:
         let path = formatPath()
         addFound()
@@ -66,15 +122,25 @@ proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc findFiles*(paths: openArray[Path], patterns: openArray[string], kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}): seq[Found] =
+func containsAny(strings: openArray[string], chars: set[char]): bool {.inline.} =
+  for s in strings:
+    for c in s:
+      if c in chars: return true
+  result = false
+
+proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[PathComponent]): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(cast[string](path))
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds)
+        m.spawn traverseFindDir(getHandle m, path, patterns, kinds)
       elif info.kind in kinds:
-        let found = path.string.lastPathPart.find(patterns)
+        let found = path.findPath(patterns)
         if found.len > 0:
           result.add Found(path: path.stripDot, kind: pcFile, matches: found)
   result &= findings.found
+
+proc traverseFind*(paths: openArray[Path], patterns: seq[string]): seq[Found] {.inline.} =
+  ## Decides to match directories based on if the pattern
+  traverseFind(paths, patterns, {pcFile, pcDir, pcLinkToFile, pcLinkToDir})
