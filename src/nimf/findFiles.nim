@@ -83,7 +83,7 @@ proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
       if result[i] == -1: return @[]
       betweenDirMatch = not lastPathPart and not (patterns[i][^1] == '/')
       start = result[i] + patterns[i].len
-  if not lastPathPart and (lastPatternSlash != patterns.high or path.string.high > lastPathSlash): result = @[]
+  if not lastPathPart and (lastPatternSlash != patterns.high or path.string.find("/", start) != -1): result = @[]
 
 proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.gcsafe.} =
   let absolute = isAbsolute(dir)
