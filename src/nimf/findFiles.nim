@@ -44,7 +44,7 @@ func findBefore(text, pattern: openArray[char], start = 0.Natural, last: Natural
   for i in start..last:
     if text.continuesWith(pattern, i):
       return i
-    elif text[i] in blacklist: break
+    if text[i] in blacklist: break
   result = -1
 
 func findBefore(text, pattern: openArray[char], start = 0.Natural, blacklist: set[char]): int {.inline.} =
@@ -73,15 +73,17 @@ proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
     if patterns[i].len == 0:
       result[i] = start
     else:
-      if i > lastPatternSlash and not lastPathPart:
-        start = lastPathSlash + 1
-        lastPathPart = true
+      if not lastPathPart:
+        if i > lastPatternSlash:
+          start = lastPathSlash + 1
+          lastPathPart = true
       if start > path.string.high: return @[]
       result[i] = if not betweenDirMatch: path.string.find(patterns[i], start)
                   else: path.string.findBefore(patterns[i], start, blacklist = {'/'})
       if result[i] == -1: return @[]
       betweenDirMatch = not lastPathPart and not (patterns[i][^1] == '/')
       start = result[i] + patterns[i].len
+  if not lastPathPart and (lastPatternSlash != patterns.high or path.string.high > lastPathSlash): result = @[]
 
 proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.gcsafe.} =
   let absolute = isAbsolute(dir)
@@ -100,17 +102,15 @@ proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], ki
     if descendent.kind == pcDir:
       let path = formatPath() & '/'
       if pcDir in kinds:
-        let absPath = if absolute: Path(descendent.path) else: dir / Path(descendent.path)
-        let found = absPath.findPath(patterns)
+        let found = path.findPath(patterns)
         if found.len > 0:
           addFound()
       m.spawn traverseFindDir(m, path, patterns, kinds)
 
     elif descendent.kind in kinds:
-      let absPath = if absolute: Path(descendent.path) else: dir / Path(descendent.path)
-      let found = absPath.findPath(patterns)
+      let path = formatPath()
+      let found = path.findPath(patterns)
       if found.len > 0:
-        let path = formatPath()
         addFound()
 
 proc stripDot(p: Path): Path {.inline.} =
