@@ -39,54 +39,28 @@ proc contains(strings: openArray[string], c: char): bool {.inline.} =
     if c in s: return true
   result = false
 
-func findBefore(text, pattern: openArray[char], start = 0.Natural, last: Natural, blacklist: set[char]): int {.inline.} =
-  ## Finds text in a path before any character in `blacklist`
-  for i in start..last:
-    if text.continuesWith(pattern, i):
-      return i
-    if text[i] in blacklist: break
-  result = -1
-
-func findBefore(text, pattern: openArray[char], start = 0.Natural, blacklist: set[char]): int {.inline.} =
-  text.findBefore(pattern, start, text.len - pattern.len, blacklist)
-
 proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
   ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
   if patterns.len == 0: return @[]
   if patterns.len == 1 and patterns[0].len == 0: return @[0]
 
-  var lastPatternSlash =
-    block body:
-      var result = -1
-      for i in countdown(patterns.high, patterns.low):
-        if '/' in patterns[i].string: result = i; break
-      result
-  var lastPathSlash = path.string.rfind("/")
-  if lastPathSlash == path.string.high and path.string.len > 1: # Skip trailing '/'
-    lastPathSlash = path.string.rfind("/", path.string.high - 1)
+  var separator = -1
+  for i in countdown(patterns.high, patterns.low):
+    if '/' in patterns[i]:
+      separator = i
+      break
+  var lastSep = path.string.rfind("/", last = path.string.high - 1)
 
   result = newSeqUninitialized[int](patterns.len)
-  var start = 0
-  var lastPathPart = false
-  var betweenDirMatch = false
-  for i in 0..patterns.high:
+  var last = path.string.high
+  for i in countdown(patterns.high, patterns.low):
     if patterns[i].len == 0:
-      result[i] = start
+      result[i] = 0
     else:
-      if not lastPathPart:
-        if i > lastPatternSlash:
-          start = lastPathSlash + 1
-          lastPathPart = true
-      if start > path.string.high: return @[]
-      result[i] = if not betweenDirMatch: path.string.find(patterns[i], start)
-                  else: path.string.findBefore(patterns[i], start, blacklist = {'/'})
+      result[i] = if i > separator: path.string.rfind(patterns[i], start = lastSep, last = last)
+                  else: path.string.rfind(patterns[i], last = last)
       if result[i] == -1: return @[]
-      betweenDirMatch = not lastPathPart and not (patterns[i][^1] == '/')
-      start = result[i] + patterns[i].len
-  if not (lastPathPart or
-          lastPatternSlash == patterns.high and
-           (patterns[^1][^1] == '/' and start == path.string.len or
-            not (patterns[^1][^1] == '/') and path.string.find("/", start) in [-1, path.string.high])): result = @[]
+      last = result[i] - patterns[i].len
 
 proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.gcsafe.} =
   let absolute = isAbsolute(dir)
