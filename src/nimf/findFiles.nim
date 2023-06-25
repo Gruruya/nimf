@@ -42,7 +42,6 @@ proc contains(strings: openArray[string], c: char): bool {.inline.} =
 proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
   ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
   if patterns.len == 0: return @[]
-  if patterns.len == 1 and patterns[0].len == 0: return @[0]
 
   var separator = -1
   for i in countdown(patterns.high, patterns.low):
@@ -53,12 +52,15 @@ proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
 
   result = newSeqUninitialized[int](patterns.len)
   var last = path.string.high
+  let sensitive = patterns.containsAny({'A'..'Z'})
+  template smartrfind(args: varargs[untyped]): untyped =
+    if sensitive: rfind(args) else: rfindI(args)
   for i in countdown(patterns.high, patterns.low):
     if patterns[i].len == 0:
       result[i] = 0
     else:
-      result[i] = if i > separator: path.string.rfind(patterns[i], start = lastSep, last = last)
-                  else: path.string.rfind(patterns[i], last = last)
+      result[i] = if i > separator: path.string.smartrfind(patterns[i], start = lastSep, last = last)
+                  else: path.string.smartrfind(patterns[i], last = last)
       if result[i] == -1: return @[]
       last = result[i] - patterns[i].len
 

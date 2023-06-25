@@ -35,7 +35,7 @@ func find*(text, pattern: openArray[char], start = 0.Natural): int =
   text.find(pattern, start, text.len - pattern.len)
 
 func preceedsWith(text, substr: openArray[char], last: Natural): bool =
-  ## Checks if `substr` is in `text` backwards, ending at `last`
+  ## Checks if `substr` is in `text` backwards ending at `last`, custom comparison procedure variant
   for i in countdown(substr.high, substr.low):
     if text[i + last] != substr[i]: return false
   result = true
@@ -72,7 +72,22 @@ func findI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): i
 func findI*(text, pattern: openArray[char], start = 0.Natural): int =
   text.findI(pattern, start, text.len - pattern.len)
 
-func containsAny(strings: openArray[string], chars: set[char]): bool {.inline.} =
+func preceedsWith(text, substr: openArray[char], start: Natural, cmp: proc): bool =
+  ## Checks if `substr` is in `text` backwards ending at `last`, custom comparison procedure variant
+  for i in countdown(substr.high, substr.low):
+    if not cmp(text[i + start], substr[i]): return false
+  result = true
+
+func rfindI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+  for i in countdown(last, start):
+    if text.preceedsWith(pattern, i, cmpInsensitive):
+      return i
+  result = -1
+
+func rfindI*(text, pattern: openArray[char], start = 0.Natural): int =
+  text.findI(pattern, start, text.len - pattern.len)
+
+func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
   for string in strings:
     for c in string:
       if c in chars: return true
