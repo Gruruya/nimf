@@ -36,11 +36,11 @@ proc display(found: Found, patterns: seq[string]) =
         stdout.setStyle({styleBright})
       let colorStart = found.matches[i]
       let colorEnd = colorStart + patterns[i].high
-      if start < parentLen and colorStart >= parentLen:
-        stdout.write path[start .. parentLen]
-        if found.kind != pcDir:
-          stdout.resetAttributes()
-        stdout.write path[parentLen + 1 ..< colorStart]
+      if found.kind != pcDir and start < parentLen and colorStart >= parentLen:
+        let sep = if parentLen + 1 == colorStart: parentLen else: colorStart
+        stdout.write path[start ..< sep]
+        stdout.resetAttributes()
+        stdout.write path[sep ..< colorStart]
       else:
         stdout.write path[start ..< colorStart]
       stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
