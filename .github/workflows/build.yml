@@ -42,7 +42,9 @@ jobs:
     - name: Install Nim, then build and test
       uses: './.github/workflows/nim-run'
       with:
-        run: nimble build -y
+        run: |
+          nim -v
+          nimble build -y
         version: ${{ matrix.nim-version }}
         arch: ${{ matrix.arch }}
         token: ${{ secrets.GITHUB_TOKEN }}
