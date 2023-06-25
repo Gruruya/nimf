@@ -29,30 +29,29 @@ proc display(found: Found, patterns: seq[string]) =
   var parentLen = path.rfind('/')
   if parentLen == path.high and path.len > 1: parentLen = path.rfind('/', parentLen - 1)
   var start = 0
-  if found.matches != @[0]:
+  if found.matches == @[0]:
+    stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
+    stdout.write path[parentLen + 1..^1]
+  else:
     for i in 0..found.matches.high:
-      if start < parentLen or found.kind == pcDir:
-        stdout.setForegroundColor(fgBlue)
-        stdout.setStyle({styleBright})
-      let colorStart = found.matches[i]
-      let colorEnd = colorStart + patterns[i].high
-      if found.kind != pcDir and start < parentLen and colorStart >= parentLen:
-        let sep = if parentLen + 1 == colorStart: parentLen else: colorStart
-        stdout.write path[start ..< sep]
-        stdout.resetAttributes()
-        stdout.write path[sep ..< colorStart]
+      let matchStart = found.matches[i]
+      let matchEnd = matchStart + patterns[i].high
+
+      if start > parentLen:
+        stdout.write path[start ..< matchStart]
+      elif found.kind != pcDir and matchStart >= parentLen:
+        stdout.styledWrite styleBright, fgBlue, path[start .. parentLen]
+        if matchStart > parentLen + 1:
+          stdout.write path[parentLen + 1 ..< matchStart]
       else:
-        stdout.write path[start ..< colorStart]
-      stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
-      start = colorEnd + 1
+        stdout.styledWrite styleBright, fgBlue, path[start ..< matchStart]
+      stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
+      start = matchEnd + 1
     if start != path.len:
       if found.kind != pcDir:
         stdout.write path[start..path.high]
       else:
         stdout.styledWrite styleBright, fgBlue, path[start..path.high]
-  else:
-    stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
-    stdout.write path[parentLen + 1..^1]
   stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
