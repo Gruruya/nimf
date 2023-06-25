@@ -26,19 +26,20 @@ export cligen
 
 proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
-  let parent = path[0 ..< path.len - path.lastPathPart.len - (if found.kind == pcDir: 1 else: 0)]
+  var parentLen = path.rfind('/')
+  if parentLen == path.high and path.len > 1: parentLen = path.rfind('/', parentLen - 1)
   var start = 0
   for i in 0..found.matches.high:
-    if start < parent.len or found.kind == pcDir:
+    if start < parentLen or found.kind == pcDir:
       stdout.setForegroundColor(fgBlue)
       stdout.setStyle({styleBright})
     let colorStart = found.matches[i]
     let colorEnd = colorStart + patterns[i].high
-    if start < parent.len and colorStart >= parent.len:
-      stdout.write path[start ..< parent.len]
+    if start < parentLen and colorStart >= parentLen:
+      stdout.write path[start ..< parentLen]
       if found.kind != pcDir:
         stdout.resetAttributes()
-      stdout.write path[parent.len ..< colorStart]
+      stdout.write path[parentLen ..< colorStart]
     else:
       stdout.write path[start ..< colorStart]
     stdout.styledWrite styleBright, fgRed, path[colorStart..colorEnd]
