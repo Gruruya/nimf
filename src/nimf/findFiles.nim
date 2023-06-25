@@ -17,7 +17,7 @@
 
 ## File path finding
 
-import ./find, std/[os, paths, locks, sugar], pkg/malebolgia
+import ./find, std/[os, paths, locks], pkg/malebolgia
 export Path
 
 type
@@ -97,12 +97,6 @@ proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], ki
 proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
-
-func containsAny(strings: openArray[string], chars: set[char]): bool {.inline.} =
-  for s in strings:
-    for c in s:
-      if c in chars: return true
-  result = false
 
 proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[PathComponent]): seq[Found] =
   var m = createMaster()
