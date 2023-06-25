@@ -32,7 +32,7 @@ type
 var findings = Findings()
 initLock(findings.lock)
 
-proc addImpl(findings: var Findings, found: Found) =
+proc addImpl(findings: var Findings, found: Found) {.inline.} =
   acquire(findings.lock)
   findings.found.add found
   release(findings.lock)
@@ -82,11 +82,11 @@ proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], ki
 
     if descendent.kind == pcDir:
       let path = formatPath() & '/'
+      m.spawn traverseFindDir(m, path, patterns, kinds)
       if pcDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
           findings.add Found(path: path, kind: descendent.kind, matches: found)
-      m.spawn traverseFindDir(m, path, patterns, kinds)
 
     elif descendent.kind in kinds:
       let path = formatPath()
