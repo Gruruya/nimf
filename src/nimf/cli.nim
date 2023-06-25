@@ -40,9 +40,11 @@ proc display(found: Found, patterns: seq[string]) =
       if start > parentLen:
         stdout.write path[start ..< matchStart]
       elif found.kind != pcDir and matchStart >= parentLen:
-        stdout.styledWrite styleBright, fgBlue, path[start .. parentLen]
-        if matchStart > parentLen + 1:
-          stdout.write path[parentLen + 1 ..< matchStart]
+        if parentLen == matchStart:
+          stdout.styledWrite styleBright, fgBlue, path[start ..< parentLen]
+        else:
+          stdout.styledWrite styleBright, fgBlue, path[start .. parentLen]
+        stdout.write path[parentLen + 1 ..< matchStart]
       else:
         stdout.styledWrite styleBright, fgBlue, path[start ..< matchStart]
       stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
