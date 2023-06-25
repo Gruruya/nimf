@@ -114,7 +114,7 @@ proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[Pat
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          result.add Found(path: path.stripDot, kind: pcFile, matches: found)
+          result.add Found(path: path.stripDot, kind: info.kind, matches: found)
   result &= findings.found
 
 proc traverseFind*(paths: openArray[Path], patterns: seq[string]): seq[Found] {.inline.} =
