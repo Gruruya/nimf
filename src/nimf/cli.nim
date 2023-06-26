@@ -211,9 +211,8 @@ proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false
 # Special argument parsing
 proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
   var uw: T # An unwrapped value
-  if argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a):
-    dst = some uw; dst.input = a.val; true
-  else: false
+  result = argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a)
+  if result: dst = some uw; dst.input = a.val
 proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
   @[a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
 
