@@ -164,22 +164,23 @@ proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
   assert self.isSome
   result = self.val
 
-proc isChildOf(path, potParent: string): bool =
-  let aPotParent = absolutePath(Path(potParent))
-  let aPath = absolutePath(Path(path))
-  if aPath == aPotParent:
-    true
-  else:
-    for parent in aPath.parentDirs:
-      if aPotParent == parent:
-        return true
-    false
-
 proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false, input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
+
+  proc isChildOf(path, potParent: string): bool =
+    let aPotParent = absolutePath(Path(potParent))
+    let aPath = absolutePath(Path(path))
+    if aPath == aPotParent:
+      true
+    else:
+      for parent in aPath.parentDirs:
+        if aPotParent == parent:
+          return true
+      false
+
   proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
-    anyIt(cast[seq[string]](paths), arg.isChildOf(it))
+    anyIt(paths, arg.isChildOf(it.string))
 
   if input.len > 0:
     for i in input.low..input.high:
