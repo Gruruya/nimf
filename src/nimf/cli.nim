@@ -27,7 +27,7 @@ from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 
-template styledWrite(f: File, style: Style, m: varargs[untyped]): untyped =
+template styledWrite(f: File, style: Style, m: varargs[untyped]) =
   f.styledWrite(style.getStyles(),
                 style.getForegroundColor().get(fgDefault),
                 style.getBackgroundColor().get(bgDefault),
@@ -39,10 +39,11 @@ proc display(found: Found, patterns: seq[string]) =
 
   let colors = parseLsColorsEnv()
   let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle())
+  let fileColor = colors.styleForPath(found.path.string)
 
   if patterns == @[""]:
     stdout.styledWrite dirColor, path[0..parentLen]
-    stdout.write path[parentLen + 1..^1]
+    stdout.styledWrite fileColor, path[parentLen + 1..^1]
   else:
     var start = 0
     for i in 0..found.matches.high:
@@ -50,22 +51,19 @@ proc display(found: Found, patterns: seq[string]) =
       let matchEnd = matchStart + patterns[i].high
 
       if start > parentLen:
-        stdout.write path[start ..< matchStart]
+        stdout.styledWrite fileColor, path[start ..< matchStart]
       elif found.kind != pcDir and matchStart >= parentLen:
         if parentLen == matchStart:
           stdout.styledWrite dirColor, path[start ..< parentLen]
         else:
-          stdout.styledWrite styleBright, fgBlue, path[start .. parentLen]
-        stdout.write path[parentLen + 1 ..< matchStart]
+          stdout.styledWrite dirColor, path[start .. parentLen]
+        stdout.styledWrite fileColor, path[parentLen + 1 ..< matchStart]
       else:
         stdout.styledWrite dirColor, path[start ..< matchStart]
       stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
       start = matchEnd + 1
     if start != path.len:
-      if found.kind != pcDir:
-        stdout.write path[start..path.high]
-      else:
-        stdout.styledWrite dirColor, path[start..path.high]
+      stdout.styledWrite fileColor, path[start..path.high]
   stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
