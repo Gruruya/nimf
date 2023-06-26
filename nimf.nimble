@@ -14,7 +14,7 @@ requires "cligen >= 1.6.6 & < 2.0.0"
 requires "adix >= 0.5.5"
 requires "lscolors >= 0.3.3"
 
-taskRequires "test", "https://github.com/disruptek/balls >= 3.0.0"
+taskRequires "test", "https://github.com/disruptek/balls.git >= 3.0.0"
 
 task test, "run tests":
   let balls =
