@@ -17,21 +17,34 @@
 
 ## CLI for finding files
 
-import ./[find, findFiles], pkg/[cligen, cligen/argcvt, malebolgia], std/[terminal, paths, macros]
+import ./[find, findFiles],
+       pkg/[cligen, cligen/argcvt, malebolgia],
+       pkg/lscolors, pkg/lscolors/[stdlibterm, entrytypes, style],
+       std/[paths, macros, tables, options]
 import std/os except getCurrentDir
+import std/terminal except Style
 from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
-export cligen
+
+template styledWrite(f: File, style: Style, m: varargs[untyped]): untyped =
+  f.styledWrite(style.getStyles(),
+                style.getForegroundColor().get(fgDefault),
+                style.getBackgroundColor().get(bgDefault),
+                m)
 
 proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
   var parentLen = path.rfind("/", path.high - 1)
-  var start = 0
+
+  let colors = parseLsColorsEnv()
+  let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle())
+
   if patterns == @[""]:
-    stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
+    stdout.styledWrite dirColor, path[0..parentLen]
     stdout.write path[parentLen + 1..^1]
   else:
+    var start = 0
     for i in 0..found.matches.high:
       let matchStart = found.matches[i]
       let matchEnd = matchStart + patterns[i].high
@@ -40,19 +53,19 @@ proc display(found: Found, patterns: seq[string]) =
         stdout.write path[start ..< matchStart]
       elif found.kind != pcDir and matchStart >= parentLen:
         if parentLen == matchStart:
-          stdout.styledWrite styleBright, fgBlue, path[start ..< parentLen]
+          stdout.styledWrite dirColor, path[start ..< parentLen]
         else:
           stdout.styledWrite styleBright, fgBlue, path[start .. parentLen]
         stdout.write path[parentLen + 1 ..< matchStart]
       else:
-        stdout.styledWrite styleBright, fgBlue, path[start ..< matchStart]
+        stdout.styledWrite dirColor, path[start ..< matchStart]
       stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
       start = matchEnd + 1
     if start != path.len:
       if found.kind != pcDir:
         stdout.write path[start..path.high]
       else:
-        stdout.styledWrite styleBright, fgBlue, path[start..path.high]
+        stdout.styledWrite dirColor, path[start..path.high]
   stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
