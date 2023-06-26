@@ -60,7 +60,7 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 var findings = Findings.init()
 
 proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
-  ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
+  ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
   if patterns.len == 0: return @[]
 
   var filenameSep = -1
@@ -83,7 +83,7 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
     else:
       result[i] = smartrfind(path.string, patterns[i], start = if i > filenameSep: lastSep else: 0, last)
       if result[i] == -1: return @[]
-      result[i] = result[i] - patterns[i].high # Return match starts
+      result[i] -= patterns[i].high # Return match starts
       last = result[i] - 1
 
 proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
