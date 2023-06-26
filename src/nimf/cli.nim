@@ -19,7 +19,6 @@
 
 import ./[find, findFiles],
        pkg/[cligen, cligen/argcvt, malebolgia],
-       pkg/lscolors, pkg/lscolors/[stdlibterm, entrytypes, style],
        std/[paths, macros, tables, options]
 import std/os except getCurrentDir
 import std/terminal except Style
@@ -27,34 +26,13 @@ from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 
-proc `==`(a, b: Color): bool =
-  a.kind == b.kind and (
-    case a.kind:
-    of ck8: a.ck8Val == b.ck8Val
-    of ckFixed: a.ckFixedVal == b.ckFixedVal
-    of ckRGB: a.ckRGBVal == b.ckRGBVal)
-
-template styledWrite(f: File, style: Style, m: varargs[untyped]) =
-  if style == default(Style):
-    f.write m
-  else:
-    f.styledWrite(style.getStyles(),
-                  style.getForegroundColor().get(fgDefault),
-                  style.getBackgroundColor().get(bgDefault),
-                  m)
-
-proc display(found: Found, patterns: seq[string], colors: LsColors) =
+proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
   var parentLen = path.rfind("/", path.high - 1)
 
-  let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle())
-  let fileColor =
-    if found.kind == pcDir: dirColor # optimization
-    else: colors.styleForPath(found.path.string) # We already `stat` in findFiles, refactor/optimization possible here
-
   if patterns == @[""]:
-    stdout.styledWrite dirColor, path[0..parentLen]
-    stdout.styledWrite fileColor, path[parentLen + 1..^1]
+    stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
+    stdout.write path[parentLen + 1..^1]
   else:
     var start = 0
     for i in 0..found.matches.high:
@@ -62,18 +40,18 @@ proc display(found: Found, patterns: seq[string], colors: LsColors) =
       let matchEnd = matchStart + patterns[i].high
 
       if start > parentLen:
-        stdout.styledWrite fileColor, path[start ..< matchStart]
-      elif dirColor != fileColor and matchStart >= parentLen:
-        stdout.styledWrite dirColor, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
-        stdout.styledWrite fileColor, path[parentLen + 1 ..< matchStart]
+        stdout.write path[start ..< matchStart]
+      elif found.kind != pcDir and matchStart >= parentLen:
+        stdout.styledWrite styleBright, fgBlue, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
+        stdout.write path[parentLen + 1 ..< matchStart]
       else:
-        stdout.styledWrite dirColor, path[start ..< matchStart]
+        stdout.styledWrite styleBright, fgBlue, path[start ..< matchStart]
 
       stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
       start = matchEnd + 1
 
     if start != path.len:
-      stdout.styledWrite fileColor, path[start..path.high]
+      stdout.write path[start..path.high]
 
   stdout.write '\n'
 
@@ -200,12 +178,10 @@ proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
     let displayColor = color.isNone and envColorEnabled or
                        color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
-    if displayColor:
-      let colors = parseLSColorsEnv()
-      for found in findings:
-        display(found, patterns, colors)
-    else:
-      for found in findings:
+    for found in findings:
+      if displayColor:
+        display(found, patterns)
+      else:
         echo found.path.string
   else:
     run(exec, findings)
