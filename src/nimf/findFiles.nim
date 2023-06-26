@@ -83,7 +83,8 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
     else:
       result[i] = smartrfind(path.string, patterns[i], start = if i > filenameSep: lastSep else: 0, last)
       if result[i] == -1: return @[]
-      last = result[i] - patterns[i].len
+      result[i] = result[i] - patterns[i].high # Return match starts
+      last = result[i] - 1
 
 proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
   let absolute = isAbsolute(dir)

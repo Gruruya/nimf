@@ -34,21 +34,6 @@ func find*(text, pattern: openArray[char], start = 0.Natural, last: Natural): in
 func find*(text, pattern: openArray[char], start = 0.Natural): int =
   text.find(pattern, start, text.len - pattern.len)
 
-func preceedsWith(text, substr: openArray[char], last: Natural): bool =
-  ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
-  for i in substr.low..substr.high:
-    if text[last - substr.high + i] != substr[i]: return false
-  result = true
-
-func rfind*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
-  for i in countdown(last, start):
-    if text.preceedsWith(pattern, i):
-      return i - pattern.high
-  result = -1
-
-func rfind*(text, pattern: openArray[char], last = -1): int =
-  text.rfind(pattern, pattern.high, if last == -1: text.high else: last)
-
 func toLowerAscii(c: char): char =
   if c in {'A'..'Z'}:
     char(uint8(c) xor 0b0010_0000'u8)
@@ -72,16 +57,31 @@ func findI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): i
 func findI*(text, pattern: openArray[char], start = 0.Natural): int =
   text.findI(pattern, start, text.len - pattern.len)
 
+func preceedsWith(text, substr: openArray[char], last: Natural): bool =
+  ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
+  for i in substr.low..substr.high:
+    if text[last - i] != substr[^(i + 1)]: return false
+  result = true
+
+func rfind*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+  for i in countdown(last, start):
+    if text.preceedsWith(pattern, i):
+      return i
+  result = -1
+
+func rfind*(text, pattern: openArray[char], last = -1): int =
+  text.rfind(pattern, pattern.high, if last == -1: text.high else: last)
+
 func preceedsWith(text, substr: openArray[char], last: Natural, cmp: proc): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
   for i in substr.low..substr.high:
-    if not cmp(text[last - substr.high + i], substr[i]): return false
+    if not cmp(text[last - i], substr[^(i + 1)]): return false
   result = true
 
 func rfindI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
   for i in countdown(last, start):
     if text.preceedsWith(pattern, i, cmpInsensitive):
-      return i - pattern.high
+      return i
   result = -1
 
 func rfindI*(text, pattern: openArray[char], last = -1): int =

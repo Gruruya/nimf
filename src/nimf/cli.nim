@@ -19,14 +19,14 @@
 
 import ./[find, findFiles], pkg/[cligen, cligen/argcvt, malebolgia], std/[terminal, paths, macros]
 import std/os except getCurrentDir
-from std/strutils import startsWith, endsWith, multiReplace, rfind
+from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 export cligen
 
 proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
-  var parentLen = path.rfind('/', path.high - 1)
+  var parentLen = path.rfind("/", path.high - 1)
   var start = 0
   if patterns == @[""]:
     stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
