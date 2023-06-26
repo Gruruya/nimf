@@ -20,32 +20,36 @@
 import ./find, std/[os, paths, locks], pkg/malebolgia
 export Path
 
+proc `&`(p: Path, c: char): Path {.inline, borrow.}
+
 type
   Found* = object
     path*: Path
     kind*: PathComponent
     matches*: seq[int]
   Findings = object
-    found: seq[Found]
-    lock: Lock
+    found*: tuple[paths: seq[Found], lock: Lock]
 
-var findings = Findings()
-initLock(findings.lock)
+proc init(_: typedesc[Findings]): Findings =
+  result = Findings()
+  initLock(result.found.lock)
+
+template withLock(lock: Lock, body: untyped): untyped =
+  acquire(lock)
+  {.gcsafe.}:
+    try:
+      body
+    finally:
+      release(lock)
 
 proc addImpl(findings: var Findings, found: Found) {.inline.} =
-  acquire(findings.lock)
-  findings.found.add found
-  release(findings.lock)
+  withLock(findings.found.lock):
+    findings.found.paths.add found
 
 template add(findings: var Findings, found: Found) =
   {.gcsafe.}: addImpl(findings, found)
 
-proc `&`(p: Path, c: char): Path {.inline, borrow.}
-
-proc contains(strings: openArray[string], c: char): bool {.inline.} =
-  for s in strings:
-    if c in s: return true
-  result = false
+var findings = Findings.init()
 
 proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
   ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
@@ -72,7 +76,7 @@ proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
       if result[i] == -1: return @[]
       last = result[i] - patterns[i].len
 
-proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent]) {.gcsafe.} =
+proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent], followSymlinks: bool) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
 
@@ -82,7 +86,7 @@ proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], ki
 
     if descendent.kind == pcDir:
       let path = formatPath() & '/'
-      m.spawn traverseFindDir(m, path, patterns, kinds)
+      m.spawn traverseFindDir(m, path, patterns, kinds, followSymlinks)
       if pcDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
@@ -98,18 +102,18 @@ proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[PathComponent]): seq[Found] =
+proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[PathComponent], followSymlinks = false): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn traverseFindDir(getHandle m, path, patterns, kinds)
+        m.spawn traverseFindDir(getHandle m, path, patterns, kinds, followSymlinks)
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
           result.add Found(path: path.stripDot, kind: info.kind, matches: found)
-  result &= findings.found
+  result &= findings.found.paths
 
 proc traverseFind*(paths: openArray[Path], patterns: seq[string]): seq[Found] {.inline.} =
   ## Decides to match directories based on if the pattern
