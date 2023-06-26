@@ -27,13 +27,15 @@ from std/strutils import startsWith, endsWith, multiReplace
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 
-proc isDefault(a: Style): bool =
-  a.fg.isNone and
-  a.bg.isNone and
-  a.font == defaultFontStyle()
+proc `==`(a, b: Color): bool =
+  a.kind == b.kind and (
+    case a.kind:
+    of ck8: a.ck8Val == b.ck8Val
+    of ckFixed: a.ckFixedVal == b.ckFixedVal
+    of ckRGB: a.ckRGBVal == b.ckRGBVal)
 
 template styledWrite(f: File, style: Style, m: varargs[untyped]) =
-  if style.isDefault():
+  if style == default(Style):
     f.write m
   else:
     f.styledWrite(style.getStyles(),
@@ -61,18 +63,18 @@ proc display(found: Found, patterns: seq[string], colors: LsColors) =
 
       if start > parentLen:
         stdout.styledWrite fileColor, path[start ..< matchStart]
-      elif found.kind != pcDir and matchStart >= parentLen:
-        if parentLen == matchStart:
-          stdout.styledWrite dirColor, path[start ..< parentLen]
-        else:
-          stdout.styledWrite dirColor, path[start .. parentLen]
+      elif dirColor != fileColor and matchStart >= parentLen:
+        stdout.styledWrite dirColor, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
         stdout.styledWrite fileColor, path[parentLen + 1 ..< matchStart]
       else:
         stdout.styledWrite dirColor, path[start ..< matchStart]
+
       stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
       start = matchEnd + 1
+
     if start != path.len:
       stdout.styledWrite fileColor, path[start..path.high]
+
   stdout.write '\n'
 
 proc stripExtension(path: Path): Path =
@@ -199,7 +201,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false
     let displayColor = color.isNone and envColorEnabled or
                        color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
     if displayColor:
-      let colors = parseLsColorsEnv()
+      let colors = parseLSColorsEnv()
       for found in findings:
         display(found, patterns, colors)
     else:
