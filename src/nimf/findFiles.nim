@@ -63,15 +63,16 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
   ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
   if patterns.len == 0: return @[]
 
-  var separator = -1
+  var filenameSep = -1
   for i in countdown(patterns.high, patterns.low):
     if '/' in patterns[i]:
-      separator = i
+      filenameSep = i
       break
   var lastSep = path.string.rfind("/", last = path.string.high - 1)
 
   result = newSeqUninitialized[int](patterns.len)
   var last = path.string.high
+
   let sensitive = patterns.containsAny({'A'..'Z'})
   template smartrfind(args: varargs[untyped]): untyped =
     if sensitive: rfind(args) else: rfindI(args)
@@ -80,7 +81,7 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
     if patterns[i].len == 0:
       result[i] = 0
     else:
-      result[i] = smartrfind(path.string, patterns[i], start = if i > separator: lastSep else: 0, last)
+      result[i] = smartrfind(path.string, patterns[i], start = if i > filenameSep: lastSep else: 0, last)
       if result[i] == -1: return @[]
       last = result[i] - patterns[i].len
 

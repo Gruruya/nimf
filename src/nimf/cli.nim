@@ -26,8 +26,7 @@ export cligen
 
 proc display(found: Found, patterns: seq[string]) =
   let path = found.path.string
-  var parentLen = path.rfind('/')
-  if parentLen == path.high and path.len > 1: parentLen = path.rfind('/', parentLen - 1)
+  var parentLen = path.rfind('/', path.high - 1)
   var start = 0
   if patterns == @[""]:
     stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
