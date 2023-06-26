@@ -156,8 +156,7 @@ proc isChildOf(path, potParent: string): bool =
         return true
     false
 
-proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): int =
-
+proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false, input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   proc alreadyAdded(paths: seq[Path]; arg: string): bool {.inline.} =
@@ -173,7 +172,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), input: seq[string]): i
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
-  let findings = traverseFind(paths, patterns)
+  let findings = traverseFind(paths, patterns, followSymlinks = followSymlinks)
 
   if exec.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
@@ -201,6 +200,7 @@ proc f*() =
                             "Entered `input` may be a pattern OR a path/path glob to search.\n" &
                             "Append `/` to the end of your pattern to search for directories.\n" &
                             "\nOptions:\n$options",
+                    short = {"followSymlinks": 'L'},
                     help = {"exec": "Execute a command for each matching search result in parallel.\n" &
                                     "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                                     "Example: f .nim -e \"$EDITOR\"+\n" &

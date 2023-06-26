@@ -11,6 +11,7 @@ namedBin["nimf"] = "f"
 requires "nim >= 1.9.3"
 requires "malebolgia"
 requires "cligen"
+requires "adix"
 
 taskRequires "test", "https://github.com/disruptek/balls >= 3.0.0"
 

@@ -17,10 +17,12 @@
 
 ## File path finding
 
-import ./find, std/[os, paths, locks], pkg/malebolgia
+import ./find, std/[os, paths, locks], pkg/malebolgia, pkg/adix/[lptabz, althash]
 export Path
 
-proc `&`(p: Path, c: char): Path {.inline, borrow.}
+proc `&`(p: Path; c: char): Path {.inline, borrow.}
+proc `&=`(x: var Path; y: char) {.inline.} = x = Path(x.string & y)
+proc hash(x: Path): Hash {.inline, borrow.}
 
 type
   Found* = object
@@ -29,12 +31,14 @@ type
     matches*: seq[int]
   Findings = object
     found*: tuple[paths: seq[Found], lock: Lock]
+    dirs*: tuple[paths: LpSetz[Path, int8, 6], lock: Lock]
 
 proc init(_: typedesc[Findings]): Findings =
-  result = Findings()
+  result.dirs.paths = initLpSetz[Path, int8, 6]()
   initLock(result.found.lock)
+  initLock(result.dirs.lock)
 
-template withLock(lock: Lock, body: untyped): untyped =
+template withLock(lock: Lock; body: untyped): untyped =
   acquire(lock)
   {.gcsafe.}:
     try:
@@ -42,16 +46,25 @@ template withLock(lock: Lock, body: untyped): untyped =
     finally:
       release(lock)
 
-proc addImpl(findings: var Findings, found: Found) {.inline.} =
+proc addImpl(findings: var Findings; found: Found) {.inline.} =
   withLock(findings.found.lock):
     findings.found.paths.add found
 
-template add(findings: var Findings, found: Found) =
-  {.gcsafe.}: addImpl(findings, found)
+proc inclImpl(findings: var Findings; path: Path) {.inline.} =
+  withLock(findings.dirs.lock):
+    findings.dirs.paths.incl path
+
+proc containsOrInclImpl(findings: var Findings; path: Path): bool {.inline.} =
+  withLock(findings.dirs.lock):
+    result = findings.dirs.paths.containsOrIncl path
+
+template add(findings: var Findings; found: Found) = {.gcsafe.}: addImpl(findings, found)
+template incl(findings: var Findings; path: Path) = {.gcsafe.}: inclImpl(findings, path)
+template containsOrIncl(findings: var Findings; path: Path): bool = {.gcsafe.}: containsOrInclImpl(findings, path)
 
 var findings = Findings.init()
 
-proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
+proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
   ## Variant of `find` which only searches the filename with your pattern that follows any patterns containing '/'
   if patterns.len == 0: return @[]
 
@@ -76,7 +89,7 @@ proc findPath*(path: sink Path, patterns: openArray[string]): seq[int] =
       if result[i] == -1: return @[]
       last = result[i] - patterns[i].len
 
-proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], kinds: set[PathComponent], followSymlinks: bool) {.gcsafe.} =
+proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
 
@@ -86,8 +99,24 @@ proc traverseFindDir(m: MasterHandle, dir: Path, patterns: openArray[string], ki
 
     if descendent.kind == pcDir:
       let path = formatPath() & '/'
+      if followSymlinks: findings.incl path
       m.spawn traverseFindDir(m, path, patterns, kinds, followSymlinks)
       if pcDir in kinds:
+        let found = path.findPath(patterns)
+        if found.len > 0:
+          findings.add Found(path: path, kind: descendent.kind, matches: found)
+
+    elif followSymlinks and descendent.kind == pcLinkToDir:
+      let path = formatPath()
+      var resolved = Path(expandSymlink(path.string))
+      if resolved == Path("/"): continue
+      if resolved.string[0] != '/':
+        resolved = dir / resolved
+      resolved &= '/'
+      if not findings.containsOrIncl resolved:
+        m.spawn traverseFindDir(m, resolved, patterns, kinds, followSymlinks)
+
+      if pcLinkToDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
           findings.add Found(path: path, kind: descendent.kind, matches: found)
@@ -102,7 +131,7 @@ proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[PathComponent], followSymlinks = false): seq[Found] =
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
@@ -114,7 +143,3 @@ proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[Pat
         if found.len > 0:
           result.add Found(path: path.stripDot, kind: info.kind, matches: found)
   result &= findings.found.paths
-
-proc traverseFind*(paths: openArray[Path], patterns: seq[string]): seq[Found] {.inline.} =
-  ## Decides to match directories based on if the pattern
-  traverseFind(paths, patterns, {pcFile, pcDir, pcLinkToFile, pcLinkToDir})
