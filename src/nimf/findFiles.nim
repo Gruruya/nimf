@@ -110,9 +110,10 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
       let path = format(descendent.path)
       var resolved = Path(expandSymlink(path.string))
       if resolved == Path("/"): continue # Special case this
-      resolved = absolute(resolved)
+      var absResolved = absolute(resolved)
+      if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
-      if not findings.seenOrIncl resolved:
+      if not findings.seenOrIncl absResolved:
         m.spawn traverseFindDir(m, resolved, patterns, kinds, followSymlinks)
 
       if pcLinkToDir in kinds:
