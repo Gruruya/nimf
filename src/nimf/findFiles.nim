@@ -102,7 +102,7 @@ proc traverseFind*(paths: openArray[Path], patterns: seq[string], kinds: set[Pat
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
-      let info = getFileInfo(cast[string](path))
+      let info = getFileInfo(path.string)
       if info.kind == pcDir:
         m.spawn traverseFindDir(getHandle m, path, patterns, kinds)
       elif info.kind in kinds:
