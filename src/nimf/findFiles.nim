@@ -50,17 +50,22 @@ proc addImpl(findings: var Findings; found: Found) {.inline.} =
   withLock(findings.found.lock):
     findings.found.paths.add found
 
-proc inclImpl(findings: var Findings; path: Path) {.inline.} =
+proc addSeenImpl(findings: var Findings; dir: Path) {.inline.} =
   withLock(findings.dirs.lock):
-    findings.dirs.paths.incl path
+    findings.dirs.paths.add dir
 
-proc containsOrInclImpl(findings: var Findings; path: Path): bool {.inline.} =
+proc seenImpl(findings: var Findings; dir: Path): bool {.inline.} =
   withLock(findings.dirs.lock):
-    result = findings.dirs.paths.containsOrIncl path
+    findings.dirs.paths.contains dir
+
+proc seenOrInclImpl(findings: var Findings; dir: Path): bool {.inline.} =
+  withLock(findings.dirs.lock):
+    result = findings.dirs.paths.containsOrIncl dir
 
 template add(findings: var Findings; found: Found) = {.gcsafe.}: addImpl(findings, found)
-template incl(findings: var Findings; path: Path) = {.gcsafe.}: inclImpl(findings, path)
-template containsOrIncl(findings: var Findings; path: Path): bool = {.gcsafe.}: containsOrInclImpl(findings, path)
+template addSeen(findings: var Findings; dir: Path) = {.gcsafe.}: addSeenImpl(findings, dir)
+template seen(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenImpl(findings, dir)
+template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenOrInclImpl(findings, dir)
 
 var findings = Findings.init()
 
@@ -99,12 +104,14 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
 
     if descendent.kind == pcDir:
       let path = formatPath() & '/'
-      if followSymlinks: findings.incl path
-      m.spawn traverseFindDir(m, path, patterns, kinds, followSymlinks)
-      if pcDir in kinds:
-        let found = path.findPath(patterns)
-        if found.len > 0:
-          findings.add Found(path: path, kind: descendent.kind, matches: found)
+      if not followSymlinks or not findings.seen path:
+        if followSymlinks:
+          findings.addSeen path
+        m.spawn traverseFindDir(m, path, patterns, kinds, followSymlinks)
+        if pcDir in kinds:
+          let found = path.findPath(patterns)
+          if found.len > 0:
+            findings.add Found(path: path, kind: descendent.kind, matches: found)
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       let path = formatPath()
@@ -113,7 +120,7 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
       if resolved.string[0] != '/':
         resolved = dir / resolved
       resolved &= '/'
-      if not findings.containsOrIncl resolved:
+      if not findings.seenOrIncl resolved:
         m.spawn traverseFindDir(m, resolved, patterns, kinds, followSymlinks)
 
       if pcLinkToDir in kinds:
