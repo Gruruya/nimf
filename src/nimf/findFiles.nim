@@ -142,7 +142,7 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
       else:
         result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
         if result[i][1] == -1: return @[]
-        result[i][0] = result[i][1] - pattern.high # Return match starts
+        result[i][0] = result[i][1] - pattern.high
       last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
@@ -163,7 +163,6 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
           result.path = path
 
         proc getSymlinkFileKind(path: Path): tuple[pc: PathComponent, broken: bool] =
-          # Helper function.
           var s: Stat
           assert(path != Path "")
           result = (pcLinkToFile, true)

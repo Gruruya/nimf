@@ -109,9 +109,7 @@ proc pathEntryType(found: Found): EntryType =
   ## Determines the entry type of this path
   case found.kind
   of pcDir: etDirectory
-  of pcLinkToDir:
-    if found.broken: etOrphanedSymbolicLink
-    else: etSymbolicLink
+  of pcLinkToDir: etSymbolicLink
   of pcLinkToFile:
     if found.broken: etOrphanedSymbolicLink
     else: etSymbolicLink
