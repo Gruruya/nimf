@@ -170,7 +170,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
           if stat(path.string, s) == 0'i32:
             if S_ISDIR(s.st_mode):
               result = (pcLinkToDir, false)
-            elif not S_ISREG(s.st_mode):
+            elif S_ISREG(s.st_mode):
               result = (pcLinkToFile, false)
 
         template resolveSymlink() =
