@@ -71,7 +71,7 @@ func rfind*(text, pattern: openArray[char], start: int, last = -1): int =
   result = -1
 
 func rfind*(text, pattern: openArray[char], last = -1): int =
-  text.rfind(pattern, pattern.high, text.high)
+  text.rfind(pattern, pattern.high, last)
 
 func preceedsWith*(text, substr: openArray[char], last: Natural, cmp: proc): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
@@ -79,14 +79,15 @@ func preceedsWith*(text, substr: openArray[char], last: Natural, cmp: proc): boo
     if not cmp(text[last - i], substr[^(i + 1)]): return false
   result = true
 
-func rfindI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+func rfindI*(text, pattern: openArray[char], start: int, last = -1): int =
+  let last = if last == -1: text.high else: last
   for i in countdown(last, start):
     if text.preceedsWith(pattern, i, cmpInsensitive):
       return i
   result = -1
 
 func rfindI*(text, pattern: openArray[char], last = -1): int =
-  text.findI(pattern, pattern.high, if last == -1: text.high else: last)
+  text.rfindI(pattern, pattern.high, last)
 
 func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
   for string in strings:
