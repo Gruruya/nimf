@@ -46,6 +46,15 @@ type
     found*: tuple[paths: seq[Found], lock: Lock]
     dirs*: tuple[paths: LpSetz[Path, int8, 6], lock: Lock]
 
+proc toFound(file: File, path: Path, matches: seq[int]): Found =
+  result = Found(path: path, matches: matches, kind: file.kind)
+  case file.kind
+  of pcFile:
+    result.stat = file.stat
+  of pcLinkToFile:
+    result.broken = file.broken
+  else: discard
+
 proc init(T: typedesc[Findings]): T =
   result.dirs.paths = initLpSetz[Path, int8, 6]()
   initLock(result.found.lock)
@@ -97,7 +106,7 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
       result[i] -= patterns[i].high # Return match starts
       last = result[i] - 1
 
-iterator walkDir*(dir: string; relative = false, checkDir = false, skipSpecial = false): File {.tags: [ReadDirEffect].} =
+iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)
   if d == nil:
     if checkDir:
@@ -126,9 +135,7 @@ iterator walkDir*(dir: string; relative = false, checkDir = false, skipSpecial =
               result = (pcLinkToFile, false)
 
         template resolveSymlink() =
-          var isSpecial: bool
           (result.kind, result.broken) = getSymlinkFileKind(path)
-          if skipSpecial and isSpecial: continue
 
         template kSetGeneric() =  # pure Posix component `k` resolution
           if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
@@ -136,7 +143,6 @@ iterator walkDir*(dir: string; relative = false, checkDir = false, skipSpecial =
             result.kind = pcDir
           elif S_ISLNK(result.stat.st_mode):
             resolveSymlink()
-          elif skipSpecial and not S_ISREG(result.stat.st_mode): continue
 
         when defined(linux) or defined(macosx) or
              defined(bsd) or defined(genode) or defined(nintendoswitch):
@@ -147,8 +153,7 @@ iterator walkDir*(dir: string; relative = false, checkDir = false, skipSpecial =
           of DT_UNKNOWN:
             kSetGeneric()
           else: # DT_REG or special "files" like FIFOs
-            if skipSpecial and x.d_type != DT_REG: continue
-            else: discard # leave it as pcFile
+            discard
         else:  # assuming that field `d_type` is not present
           kSetGeneric()
 
@@ -157,7 +162,7 @@ iterator walkDir*(dir: string; relative = false, checkDir = false, skipSpecial =
 
 proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
   let absolute = isAbsolute(dir)
-  for descendent in dir.string.walkDir(relative = not absolute):
+  for descendent in dir.string.walkDirStat(relative = not absolute):
     template format(path: Path): Path =
       if absolute or dir.string in [".", "./"]: path
       else: dir / path
@@ -175,7 +180,7 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
       if pcDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          findings.add Found(path: path, kind: descendent.kind, matches: found)
+          findings.add descendent.toFound(path, matches = found)
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       let path = format(descendent.path)
@@ -190,13 +195,13 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
       if pcLinkToDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          findings.add Found(path: path, kind: descendent.kind, matches: found)
+          findings.add descendent.toFound(path, matches = found)
 
     elif descendent.kind in kinds:
       let path = format(descendent.path)
       let found = path.findPath(patterns)
       if found.len > 0:
-        findings.add Found(path: path, kind: descendent.kind, matches: found)
+        findings.add descendent.toFound(path, matches = found)
 
 proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
@@ -212,5 +217,14 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          result.add Found(path: path.stripDot, kind: info.kind, matches: found)
+          case info.kind
+          of pcFile:
+            var s: Stat
+            if lstat(path.string, s) < 0'i32: continue
+            result.add Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
+          of pcLinkToFile:
+            var s: Stat
+            let broken = stat(path.string, s) < 0'i32
+            result.add Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
+          else: result.add Found(path: path.stripDot, kind: info.kind, matches: found)
   result &= findings.found.paths

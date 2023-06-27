@@ -19,20 +19,106 @@
 
 import ./[find, findFiles],
        pkg/[cligen, cligen/argcvt, malebolgia],
-       std/[paths, macros, tables, options]
+       pkg/lscolors, pkg/lscolors/[stdlibterm, entrytypes, style],
+       std/[paths, macros, tables, options, posix]
 import std/os except getCurrentDir
 import std/terminal except Style
-from std/strutils import startsWith, endsWith, multiReplace
+from std/strutils import startsWith, multiReplace
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 
-proc display(found: Found, patterns: seq[string]) =
+proc `==`(a, b: Color): bool =
+  a.kind == b.kind and (
+    case a.kind:
+    of ck8: a.ck8Val == b.ck8Val
+    of ckFixed: a.ckFixedVal == b.ckFixedVal
+    of ckRGB: a.ckRGBVal == b.ckRGBVal)
+
+proc write(f: File, style: Style, m: varargs[string]) =
+  let fg = style.getForegroundColor()
+  let bg = style.getBackgroundColor()
+  let font = style.getStyles()
+
+  var styled = false
+  if fg.isSome: stdout.setForegroundColor(fg.unsafeGet); styled = true
+  if bg.isSome: stdout.setBackgroundColor(bg.unsafeGet); styled = true
+  if font != {}: stdout.setStyle(font); styled = true
+  f.write(m)
+  if styled: stdout.resetAttributes()
+
+proc pathEntryType(found: Found): EntryType =
+  ## Determines the entry type of this path
+  case found.kind
+  of pcDir: etDirectory
+  of pcLinkToDir:
+    if found.broken: etOrphanedSymbolicLink
+    else: etSymbolicLink
+  of pcLinkToFile:
+    if found.broken: etOrphanedSymbolicLink
+    else: etSymbolicLink
+  else:
+    if S_ISBLK(found.stat.st_mode): etBlockDevice
+    elif S_ISCHR(found.stat.st_mode): etCharacterDevice
+    elif S_ISFIFO(found.stat.st_mode): etFIFO
+    elif S_ISSOCK(found.stat.st_mode): etSocket
+    elif (found.stat.st_mode.cint and S_ISUID) != 0'i32: etSetuid
+    elif (found.stat.st_mode.cint and S_ISGID) != 0'i32: etSetgid
+    elif (found.stat.st_mode.cint and S_ISVTX) != 0'i32: etSticky
+    elif S_ISREG(found.stat.st_mode):
+      # Check if this file is executable
+      if (found.stat.st_mode.cint and S_IXUSR) != 0'i32 or
+         (found.stat.st_mode.cint and S_IXGRP) != 0'i32 or
+         (found.stat.st_mode.cint and S_IXOTH) != 0'i32: etExecutableFile
+      else: etRegularFile
+    else: etNormal
+
+func endsWith(s, suffix: openArray[char]): bool {.inline.} =
+  s.preceedsWith(suffix, s.high)
+
+proc pathMatchesPattern(path: string, pattern: string): bool {.inline.} =
+  ## Returns true if the path matches this pattern
+  path.len != 0 and pattern.len != 0 and
+    # We assume that LS_COLORS patterns are just
+    # either exact file names or suffixes
+    (if pattern[0] == '*': #TODO: Table of extensions instead of looping comparison, need to change `patterns`/`LsColors`
+      for i in 0..pattern.high - 1:
+        if path[path.high - i] != pattern[^(i + 1)]: return false
+      true
+    else:
+      path == pattern)
+
+proc styleForDirEntry(lsc: LsColors, entry: Entry): Style =
+  ## Returns the style which should be used for this specific entry
+  # Special case: inherit style from target
+  if entry.typ == etSymbolicLink and lsc.lnTarget:
+    let target = entry.path.expandSymlink
+    result = styleForDirEntry(lsc, Entry(path: target, typ: target.pathEntryType()))
+
+  # Pick style from type
+  elif entry.typ != etNormal and entry.typ != etRegularFile:
+    result = lsc.types.getOrDefault(entry.typ, defaultStyle())
+
+  # Pick style from path
+  else:
+    for pattern, style in lsc.patterns.pairs:
+      if pathMatchesPattern(entry.path, pattern):
+        return style
+
+proc styleForPath(lsc: LsColors, found: Found): Style {.inline.} =
+  styleForDirEntry(lsc, Entry(path: found.path.string, typ: found.pathEntryType()))
+
+proc display(found: Found, patterns: seq[string], colors: LsColors) =
   let path = found.path.string
-  var parentLen = path.rfind("/", path.high - 1)
+  var parentLen = path.rfind("/", last = path.high - 1)
+
+  let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle())
+  let fileColor =
+    if found.kind == pcDir: dirColor # optimization
+    else: colors.styleForPath(found)
 
   if patterns == @[""]:
-    stdout.styledWrite styleBright, fgBlue, path[0..parentLen]
-    stdout.write path[parentLen + 1..^1]
+    stdout.write dirColor, path[0..parentLen]
+    stdout.write fileColor, path[parentLen + 1..^1]
   else:
     var start = 0
     for i in 0..found.matches.high:
@@ -40,18 +126,18 @@ proc display(found: Found, patterns: seq[string]) =
       let matchEnd = matchStart + patterns[i].high
 
       if start > parentLen:
-        stdout.write path[start ..< matchStart]
-      elif found.kind != pcDir and matchStart >= parentLen:
-        stdout.styledWrite styleBright, fgBlue, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
-        stdout.write path[parentLen + 1 ..< matchStart]
+        stdout.write fileColor, path[start ..< matchStart]
+      elif dirColor != fileColor and matchStart >= parentLen:
+        stdout.write dirColor, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
+        stdout.write fileColor, path[parentLen + 1 ..< matchStart]
       else:
-        stdout.styledWrite styleBright, fgBlue, path[start ..< matchStart]
+        stdout.write dirColor, path[start ..< matchStart]
 
       stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
       start = matchEnd + 1
 
     if start != path.len:
-      stdout.write path[start..path.high]
+      stdout.write fileColor, path[start..path.high]
 
   stdout.write '\n'
 
@@ -106,7 +192,7 @@ proc run(cmds: seq[string], findings: seq[Found]) =
   m.awaitAll:
     for cmd in cmds:
       let allIndexes = cmd.findAll(Target.mapIt($it))
-      if cmd.endsWith '+':
+      if cmd.endsWith "+":
         let cmd = cmd[0..^2]
         var replacements = newSeq[(string, string)]()
         for t in Target:
@@ -178,10 +264,12 @@ proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
     let displayColor = color.isNone and envColorEnabled or
                        color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
-    for found in findings:
-      if displayColor:
-        display(found, patterns)
-      else:
+    if displayColor:
+      let colors = parseLSColorsEnv()
+      for found in findings:
+        display(found, patterns, colors)
+    else:
+      for found in findings:
         echo found.path.string
   else:
     run(exec, findings)
