@@ -79,15 +79,15 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 
 var findings = Findings.init()
 
-proc globFind*(path: Path; pattern: openArray[char]): (int, int) =
+proc globFind*(path: Path; pattern: openArray[char]; h: var int): (int, int) =
   var globbing = false
-  var h = path.string.high
   var j = pattern.high
   while j >= 0:
     if globbing:
       while true:
         if path.string[h] == pattern[j]:
           globbing = false
+          if result[1] == 0: result[1] = h
           dec h
           dec j
           break
@@ -105,11 +105,11 @@ proc globFind*(path: Path; pattern: openArray[char]): (int, int) =
       elif path.string[h] != pattern[j]:
         return (-1, -1)
       else:
+        if result[1] == 0: result[1] = h
         dec h
         dec j
         if h < 0: return (-1, -1)
-  result[0] = max(h, 0)
-  result[1] = result[0] + pattern.high
+  result[0] = h + 1
 
 proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
@@ -131,19 +131,20 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if sensitive: rfind(args) else: rfindI(args)
 
   for i in countdown(patterns.high, patterns.low):
+    if last < 0: return @[]
     let pattern = patterns[i]
     if pattern.len == 0:
       result[i] = (0, 0)
     else:
       let glob = '*' in pattern
       if glob:
-        result[i] = globFind(path, pattern)
+        result[i] = globFind(path, pattern, last)
         if result[i] == (-1, -1): return @[]
       else:
         result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
         if result[i][1] == -1: return @[]
         result[i][0] = result[i][1] - pattern.high
-      last = result[i][0] - 1
+        last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)
