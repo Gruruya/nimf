@@ -17,7 +17,7 @@
 
 ## File path finding
 
-import ./find, std/[os, paths, locks], pkg/malebolgia, pkg/adix/[lptabz, althash]
+import ./find, std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 export Path
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
@@ -27,13 +27,26 @@ proc hash(x: Path): Hash {.inline, borrow.}
 type
   Found* = object
     path*: Path
-    kind*: PathComponent
     matches*: seq[int]
+    case kind*: PathComponent
+    of pcFile:
+      stat*: Stat
+    of pcLinkToFile:
+      broken*: bool
+    else: discard
+  File = object
+    path*: Path
+    case kind*: PathComponent
+    of pcFile:
+      stat*: Stat
+    of pcLinkToFile:
+      broken*: bool
+    else: discard
   Findings = object
     found*: tuple[paths: seq[Found], lock: Lock]
     dirs*: tuple[paths: LpSetz[Path, int8, 6], lock: Lock]
 
-proc init(_: typedesc[Findings]): Findings =
+proc init(T: typedesc[Findings]): T =
   result.dirs.paths = initLpSetz[Path, int8, 6]()
   initLock(result.found.lock)
   initLock(result.dirs.lock)
@@ -41,10 +54,8 @@ proc init(_: typedesc[Findings]): Findings =
 template withLock(lock: Lock; body: untyped): untyped =
   acquire(lock)
   {.gcsafe.}:
-    try:
-      body
-    finally:
-      release(lock)
+    try: body
+    finally: release(lock)
 
 proc addImpl(findings: var Findings; found: Found) {.inline.} =
   withLock(findings.found.lock):
@@ -86,12 +97,70 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
       result[i] -= patterns[i].high # Return match starts
       last = result[i] - 1
 
+iterator walkDir*(dir: string; relative = false, checkDir = false, skipSpecial = false): File {.tags: [ReadDirEffect].} =
+  var d = opendir(dir)
+  if d == nil:
+    if checkDir:
+      raiseOSError(osLastError(), dir)
+  else:
+    defer: discard closedir(d)
+    while true:
+      var x = readdir(d)
+      if x == nil: break
+      var result = File(kind: pcFile)
+      result.path = Path($cast[cstring](addr x.d_name))
+      if result.path notin [Path ".", Path ".."]:
+        let path = Path(dir) / result.path
+        if not relative:
+          result.path = path
+
+        proc getSymlinkFileKind(path: Path): tuple[pc: PathComponent, broken: bool] =
+          # Helper function.
+          var s: Stat
+          assert(path != Path "")
+          result = (pcLinkToFile, true)
+          if stat(path.string, s) == 0'i32:
+            if S_ISDIR(s.st_mode):
+              result = (pcLinkToDir, false)
+            elif not S_ISREG(s.st_mode):
+              result = (pcLinkToFile, false)
+
+        template resolveSymlink() =
+          var isSpecial: bool
+          (result.kind, result.broken) = getSymlinkFileKind(path)
+          if skipSpecial and isSpecial: continue
+
+        template kSetGeneric() =  # pure Posix component `k` resolution
+          if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
+          elif S_ISDIR(result.stat.st_mode):
+            result.kind = pcDir
+          elif S_ISLNK(result.stat.st_mode):
+            resolveSymlink()
+          elif skipSpecial and not S_ISREG(result.stat.st_mode): continue
+
+        when defined(linux) or defined(macosx) or
+             defined(bsd) or defined(genode) or defined(nintendoswitch):
+          case x.d_type
+          of DT_DIR: result.kind = pcDir
+          of DT_LNK:
+            resolveSymlink()
+          of DT_UNKNOWN:
+            kSetGeneric()
+          else: # DT_REG or special "files" like FIFOs
+            if skipSpecial and x.d_type != DT_REG: continue
+            else: discard # leave it as pcFile
+        else:  # assuming that field `d_type` is not present
+          kSetGeneric()
+
+        yield result
+
+
 proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDir(relative = not absolute):
-    template format(path: string): Path =
-      if absolute or dir.string in [".", "./"]: Path(path)
-      else: dir / Path(path)
+    template format(path: Path): Path =
+      if absolute or dir.string in [".", "./"]: path
+      else: dir / path
 
     template absolute(path: Path): Path =
       if absolute: path
