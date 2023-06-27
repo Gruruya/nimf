@@ -27,7 +27,7 @@ proc hash(x: Path): Hash {.inline, borrow.}
 type
   Found* = object
     path*: Path
-    matches*: seq[int]
+    matches*: seq[(int, int)]
     case kind*: PathComponent
     of pcFile:
       stat*: Stat
@@ -46,7 +46,7 @@ type
     found*: tuple[paths: seq[Found], lock: Lock]
     dirs*: tuple[paths: LpSetz[Path, int8, 6], lock: Lock]
 
-proc toFound(file: File, path: Path, matches: seq[int]): Found =
+proc toFound(file: File, path: Path, matches: seq[(int, int)]): Found =
   result = Found(path: path, matches: matches, kind: file.kind)
   case file.kind
   of pcFile:
@@ -79,8 +79,41 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 
 var findings = Findings.init()
 
-proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
+proc globFind*(path: Path; pattern: openArray[char]): (int, int) =
+  var globbing = false
+  var h = path.string.high
+  var j = pattern.high
+  while j >= 0:
+    if globbing:
+      while true:
+        if path.string[h] == pattern[j]:
+          globbing = false
+          dec h
+          dec j
+          break
+        elif path.string[h] == '/':
+          if j < 0: break
+          else: return (-1, -1)
+        else:
+          dec h
+          if h < 0:
+            if j < 0: break
+            else: return (-1, -1)
+    else:
+      globbing = pattern[j] == '*'
+      if globbing: dec j
+      elif path.string[h] != pattern[j]:
+        return (-1, -1)
+      else:
+        dec h
+        dec j
+        if h < 0: return (-1, -1)
+  result[0] = max(h, 0)
+  result[1] = result[0] + pattern.high
+
+proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
+  ## Also has `*` globbing
   if patterns.len == 0: return @[]
 
   var filenameSep = -1
@@ -90,7 +123,7 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
       break
   var lastSep = path.string.rfind("/", last = path.string.high - 1)
 
-  result = newSeqUninitialized[int](patterns.len)
+  result = newSeq[(int, int)](patterns.len)
   var last = path.string.high
 
   let sensitive = patterns.containsAny({'A'..'Z'})
@@ -98,13 +131,19 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[int] =
     if sensitive: rfind(args) else: rfindI(args)
 
   for i in countdown(patterns.high, patterns.low):
-    if patterns[i].len == 0:
-      result[i] = 0
+    let pattern = patterns[i]
+    if pattern.len == 0:
+      result[i] = (0, 0)
     else:
-      result[i] = smartrfind(path.string, patterns[i], start = if i > filenameSep: lastSep else: 0, last)
-      if result[i] == -1: return @[]
-      result[i] -= patterns[i].high # Return match starts
-      last = result[i] - 1
+      let glob = '*' in pattern
+      if glob:
+        result[i] = globFind(path, pattern)
+        if result[i] == (-1, -1): return @[]
+      else:
+        result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+        if result[i][1] == -1: return @[]
+        result[i][0] = result[i][1] - pattern.high # Return match starts
+      last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)
@@ -160,7 +199,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
         yield result
 
 
-proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDirStat(relative = not absolute):
     template format(path: Path): Path =
@@ -176,7 +215,7 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
       if followSymlinks:
         let absPath = path.absolute
         if findings.seenOrIncl absPath: continue
-      m.spawn traverseFindDir(m, path, patterns, kinds, followSymlinks)
+      m.spawn findDirRec(m, path, patterns, kinds, followSymlinks)
       if pcDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
@@ -190,7 +229,7 @@ proc traverseFindDir(m: MasterHandle; dir: Path; patterns: openArray[string]; ki
       if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
       if not findings.seenOrIncl absResolved:
-        m.spawn traverseFindDir(m, resolved, patterns, kinds, followSymlinks)
+        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks)
 
       if pcLinkToDir in kinds:
         let found = path.findPath(patterns)
@@ -213,18 +252,18 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn traverseFindDir(getHandle m, path, patterns, kinds, followSymlinks)
+        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks)
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
           case info.kind
           of pcFile:
             var s: Stat
-            if lstat(path.string, s) < 0'i32: continue
+            if lstat(cstring path.string, s) < 0'i32: continue
             result.add Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
           of pcLinkToFile:
             var s: Stat
-            let broken = stat(path.string, s) < 0'i32
+            let broken = stat(cstring path.string, s) < 0'i32
             result.add Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
           else: result.add Found(path: path.stripDot, kind: info.kind, matches: found)
   result &= findings.found.paths

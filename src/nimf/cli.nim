@@ -171,8 +171,8 @@ proc display(found: Found, patterns: seq[string], colors: LSColors) =
   else:
     var start = 0
     for i in 0..found.matches.high:
-      let matchStart = found.matches[i]
-      let matchEnd = matchStart + patterns[i].high
+      let matchStart = found.matches[i][0]
+      let matchEnd = found.matches[i][1]
 
       if start > parentLen:
         stdout.write fileColor, path[start ..< matchStart]
