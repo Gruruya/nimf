@@ -86,7 +86,7 @@ proc globFind*(path: Path; pattern: openArray[char]; h: var int): (int, int) =
     if globbing:
       while true:
         if path.string[h] == pattern[j]:
-          if j == 0 and (h > 0 and path.string[h - 1] != '/'): return (-1, -1)
+          if j == 0 and (h > 0 and path.string[h] != '/' and path.string[h - 1] != '/'): return (-1, -1)
           globbing = false
           if result[1] == 0: result[1] = h
           dec h
@@ -106,7 +106,7 @@ proc globFind*(path: Path; pattern: openArray[char]; h: var int): (int, int) =
       elif path.string[h] != pattern[j]:
         return (-1, -1)
       else:
-        if j == 0 and (h > 0 and path.string[h - 1] != '/'): return (-1, -1)
+        if j == 0 and (h > 0 and path.string[h] != '/' and path.string[h - 1] != '/'): return (-1, -1)
         if result[1] == 0: result[1] = h
         dec h
         dec j
