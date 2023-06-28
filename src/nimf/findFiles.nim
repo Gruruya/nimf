@@ -18,6 +18,7 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
+from std/strutils import split
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc `&=`(x: var Path; y: char) {.inline.} = x = Path(x.string & y)
@@ -80,6 +81,7 @@ var findings = Findings.init()
 
 proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
+  ## Also has `*` globbing
   if patterns.len == 0: return @[]
 
   var filenameSep = -1
@@ -102,10 +104,26 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if pattern.len == 0:
       result[i] = (0, 0)
     else:
-      result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
-      if result[i][1] == -1: return @[]
-      result[i][0] = result[i][1] - pattern.high
-      last = result[i][0] - 1
+      let glob = '*' in pattern
+      if glob:
+        if not(pattern[^1] == '*' or path.string[last] == pattern[^1] or last >= 1 and path.string[last] == '/' and path.string[last - 1] == pattern[^1]):
+          return @[]
+        let patterns = pattern.split('*')
+        var j = patterns.high
+        while true:
+          let found = smartrfind(path.string, patterns[j], start = if i > filenameSep: lastSep else: 0, last)
+          if found == -1: return @[]
+          if result[i][1] == 0: result[i][1] = found
+          result[i][0] = found - patterns[j].high
+          last = result[i][0] - 1
+          if j != 0 or pattern[0] == '*' or last == -1 or path.string[result[i][0]] == '/' or path.string[last] == '/':
+            dec j
+            if j < 0: break
+      else:
+        result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+        if result[i][1] == -1: return @[]
+        result[i][0] = result[i][1] - pattern.high
+        last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)

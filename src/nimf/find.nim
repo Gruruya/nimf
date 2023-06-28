@@ -19,7 +19,7 @@
 
 {.push inline, checks: off.}
 
-func continuesWith*(text, substr: openArray[char], start: Natural): bool =
+func continuesWith*(text, substr: openArray[char]; start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`
   for i in substr.low..substr.high:
     if text[i + start] != substr[i]: return false
@@ -31,8 +31,8 @@ func find*(text, pattern: openArray[char], start = 0.Natural, last: Natural): in
       return i
   result = -1
 
-func find*(text, pattern: openArray[char], start = 0.Natural): int =
-  text.find(pattern, start, text.len - pattern.len)
+func find*(text, pattern: openArray[char]; start = 0.Natural): int =
+  find(text, pattern, start, text.len - pattern.len)
 
 func toLowerAscii(c: char): char =
   if c in {'A'..'Z'}:
@@ -42,7 +42,7 @@ func toLowerAscii(c: char): char =
 func cmpInsensitive(a, b: char): bool =
   a.toLowerAscii == b.toLowerAscii
 
-func continuesWith*(text, substr: openArray[char], start: Natural, cmp: proc): bool =
+func continuesWith*(text, substr: openArray[char]; start: Natural; cmp: proc): bool =
   ## Checks if `substr` is in `text` starting at `start`, custom comparison procedure variant
   for i in substr.low..substr.high:
     if not cmp(text[i + start], substr[i]): return false
@@ -55,7 +55,7 @@ func findI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): i
   result = -1
 
 func findI*(text, pattern: openArray[char], start = 0.Natural): int =
-  text.findI(pattern, start, text.len - pattern.len)
+  findI(text, pattern, start, text.len - pattern.len)
 
 func preceedsWith*(text, substr: openArray[char], last: Natural): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
@@ -71,11 +71,11 @@ func rfind*(text, pattern: openArray[char], start, last: int): int =
   result = -1
 
 func rfind*(text, pattern: openArray[char], start: int): int =
-  text.rfind(pattern, start, text.high)
+  rfind(text, pattern, start, text.high)
 func rfind*(text, pattern: openArray[char], last: int): int =
-  text.rfind(pattern, pattern.high, last)
+  rfind(text, pattern, pattern.high, last)
 func rfind*(text, pattern: openArray[char]): int =
-  text.rfind(pattern, pattern.high, text.high)
+  rfind(text, pattern, pattern.high, text.high)
 
 func preceedsWith*(text, substr: openArray[char], last: Natural, cmp: proc): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
@@ -90,11 +90,11 @@ func rfindI*(text, pattern: openArray[char], start, last: int): int =
   result = -1
 
 func rfindI*(text, pattern: openArray[char], start: int): int =
-  text.rfindI(pattern, start, text.high)
+  rfindI(text, pattern, start, text.high)
 func rfindI*(text, pattern: openArray[char], last: int): int =
-  text.rfindI(pattern, pattern.high, last)
+  rfindI(text, pattern, pattern.high, last)
 func rfindI*(text, pattern: openArray[char]): int =
-  text.rfindI(pattern, pattern.high, text.high)
+  rfindI(text, pattern, pattern.high, text.high)
 
 func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
   for string in strings:
