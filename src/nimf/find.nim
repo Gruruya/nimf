@@ -146,17 +146,6 @@ func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[int]]
          text.continuesWithB(pattern, i):
            result[j].add i
 
-func split*(text: openArray[char], separators: set[char]): seq[seq[char]] =
-  ## Split a string at every separator
-  var start = 0
-  for i in 0 ..< text.high:
-    if text[i] in separators:
-      result.add text[start ..< i]
-      start = i + 1
-  if text[^1] in separators:
-        result.add text[start ..< text.high]
-  else: result.add text[start .. text.high]
-
 # Workaround for `system.find`
 template find*(text: openArray[char], pattern: string): int = find(text, pattern, 0)
 template find*(text: string, patterns: openArray[string]): seq[int] = find(text, patterns, 0)

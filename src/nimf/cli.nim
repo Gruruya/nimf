@@ -40,12 +40,6 @@ type
     pattern: string
     color: string
 
-proc init(T: typedesc[LSColors]): LSColors =
-  LSColors(types: newTable[EntryType, Style](),
-           patterns: newTable[string, Style](),
-           extensions: initLPSetz[string, int8, 6],
-           lnTarget: false)
-
 proc rawParse(str: string): seq[RawRule] =
   for rule in str.split(':'):
     let splitted = rule.split('=')
