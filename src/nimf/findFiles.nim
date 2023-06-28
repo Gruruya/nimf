@@ -116,9 +116,10 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
           if result[i][1] == 0: result[i][1] = found
           result[i][0] = found - patterns[j].high
           last = result[i][0] - 1
-          if j != 0 or pattern[0] == '*' or last == -1 or path.string[result[i][0]] == '/' or path.string[last] == '/':
+          if j != 0:
             dec j
-            if j < 0: break
+          elif pattern[0] == '*' or result[i][0] == 0 or path.string[result[i][0]] == '/' or path.string[last] == '/':
+            break
       else:
         result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
         if result[i][1] == -1: return @[]
