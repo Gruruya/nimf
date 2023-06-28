@@ -34,12 +34,12 @@ func find*(text, pattern: openArray[char], start = 0.Natural, last: Natural): in
 func find*(text, pattern: openArray[char]; start = 0.Natural): int =
   find(text, pattern, start, text.len - pattern.len)
 
-func toLowerAscii(c: char): char =
+func toLowerAscii*(c: char): char =
   if c in {'A'..'Z'}:
     char(uint8(c) xor 0b0010_0000'u8)
   else: c
 
-func cmpInsensitive(a, b: char): bool =
+func cmpInsensitive*(a, b: char): bool =
   a.toLowerAscii == b.toLowerAscii
 
 func continuesWith*(text, substr: openArray[char]; start: Natural; cmp: proc): bool =
