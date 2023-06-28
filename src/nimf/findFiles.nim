@@ -104,6 +104,13 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if pattern.len == 0:
       result[i] = (0, 0)
     else:
+      template search(pattern: openArray[char]): untyped =
+        let found = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+        if found == -1: return @[]
+        if result[i][1] == 0: result[i][1] = found
+        result[i][0] = found - pattern.high
+        last = result[i][0] - 1
+
       let glob = '*' in pattern
       if glob:
         if not(pattern[^1] == '*' or path.string[last] == pattern[^1] or last >= 1 and path.string[last] == '/' and path.string[last - 1] == pattern[^1]):
@@ -111,20 +118,13 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
         let patterns = pattern.split('*')
         var j = patterns.high
         while true:
-          let found = smartrfind(path.string, patterns[j], start = if i > filenameSep: lastSep else: 0, last)
-          if found == -1: return @[]
-          if result[i][1] == 0: result[i][1] = found
-          result[i][0] = found - patterns[j].high
-          last = result[i][0] - 1
+          search(patterns[j])
           if j != 0:
             dec j
           elif pattern[0] == '*' or result[i][0] == 0 or path.string[result[i][0]] == '/' or path.string[last] == '/':
             break
       else:
-        result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
-        if result[i][1] == -1: return @[]
-        result[i][0] = result[i][1] - pattern.high
-        last = result[i][0] - 1
+        search(pattern)
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)
@@ -156,7 +156,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
         template resolveSymlink() =
           (result.kind, result.broken) = getSymlinkFileKind(path)
 
-        template kSetGeneric() =  # pure Posix component `k` resolution
+        template kSetGeneric() = # pure Posix component `k` resolution
           if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
           elif S_ISDIR(result.stat.st_mode):
             result.kind = pcDir
