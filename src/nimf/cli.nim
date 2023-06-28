@@ -178,7 +178,11 @@ proc display(found: Found, patterns: seq[string], colors: LSColors) =
       start = matchEnd + 1
 
     if start != path.len:
-      stdout.write fileColor, path[start..path.high]
+      if start > parentLen or dirColor == fileColor:
+        stdout.write fileColor, path[start..path.high]
+      else:
+        stdout.write dirColor, path[start .. parentLen]
+        stdout.write fileColor, path[parentLen + 1 .. path.high]
 
   stdout.write '\n'
 

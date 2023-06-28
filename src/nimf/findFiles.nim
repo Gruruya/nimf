@@ -19,6 +19,7 @@
 
 import ./find, std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 from std/strutils import split
+from std/sequtils import filterIt
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc `&=`(x: var Path; y: char) {.inline.} = x = Path(x.string & y)
@@ -77,34 +78,6 @@ proc seenOrInclImpl(findings: var Findings; dir: Path): bool {.inline.} =
 template add(findings: var Findings; found: Found) = {.gcsafe.}: addImpl(findings, found)
 template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenOrInclImpl(findings, dir)
 
-func preceedsWithExcept(text, substr: openArray[char], last: Natural; blacklist: set[char]): int =
-  ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
-  for i in substr.low..substr.high:
-    if text[last - i] != substr[^(i + 1)]: return if text[last - i] in blacklist: 2 else: 1
-  result = 0
-
-func rfindExcept(text, pattern: openArray[char], start, last: int; blacklist: set[char]): int =
-  for i in countdown(last, start):
-    let res = text.preceedsWithExcept(pattern, i, blacklist)
-    if res == 0:
-      return i
-    elif res == 2: return -1
-  result = -1
-
-func preceedsWithExcept*(text, substr: openArray[char], last: Natural; cmp: proc; blacklist: set[char]): int =
-  ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
-  for i in substr.low..substr.high:
-    if not cmp(text[last - i], substr[^(i + 1)]): return if text[last - i] in blacklist: 2 else: 1
-  result = 0
-
-func rfindIExcept*(text, pattern: openArray[char], start, last: int; blacklist: set[char]): int =
-  for i in countdown(last, start):
-    let res = text.preceedsWithExcept(pattern, i, cmpInsensitive, blacklist)
-    if res == 0:
-      return i
-    elif res == 2: return -1
-  result = -1
-
 var findings = Findings.init()
 
 proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
@@ -123,6 +96,8 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
   var last = path.string.high
 
   let sensitive = patterns.containsAny({'A'..'Z'})
+  template smartrfind(args: varargs[untyped]): untyped =
+    if sensitive: rfind(args) else: rfindI(args)
 
   for i in countdown(patterns.high, patterns.low):
     if last < 0: return @[]
@@ -132,27 +107,28 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     else:
       let glob = '*' in pattern
       if glob:
-        if not(pattern[^1] == '*' or path.string[last] == pattern[^1] or last >= 1 and path.string[last] == '/' and path.string[last - 1] == pattern[^1]):
-          return @[]
-        let patterns = pattern.split('*')
+        let patterns = pattern.split('*').filterIt(it.len > 0)
         var j = patterns.high
         while true:
           if j < 0: break
           elif patterns[j].len == 0: dec j; continue
-          template smartrfind(args: varargs[untyped]): untyped =
-            if sensitive: rfindExcept(args, {'/'}) else: rfindIExcept(args, {'/'})
+
           let found = smartrfind(path.string, patterns[j], start = if i > filenameSep: lastSep else: 0, last)
           if found == -1: return @[]
-          if result[i][1] == 0: result[i][1] = found
+
           result[i][0] = found - patterns[j].high
           last = result[i][0] - 1
-          if j != 0:
+
+          if result[i][1] == 0:
+            if pattern[^1] in {'*', '/'} or path.string[found + 1] == '/' or found == path.string.high:
+              dec j
+              if result[i][1] == 0: result[i][1] = found
+          elif j == patterns.low:
+            if pattern[0] in {'*', '/'} or result[i][0] == 0 or path.string[last] == '/':
+              break
+          else:
             dec j
-          elif pattern[0] == '*' or result[i][0] == 0 or path.string[result[i][0]] == '/' or path.string[last] == '/':
-            break
       else:
-        template smartrfind(args: varargs[untyped]): untyped =
-          if sensitive: rfind(args) else: rfindI(args)
         result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
         if result[i][1] == -1: return @[]
         result[i][0] = result[i][1] - pattern.high
