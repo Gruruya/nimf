@@ -17,6 +17,9 @@
 
 ## Finding primitives
 
+import std/options
+export options
+
 {.push inline, checks: off.}
 
 func continuesWith*(text, substr: openArray[char]; start: Natural): bool =
@@ -25,13 +28,13 @@ func continuesWith*(text, substr: openArray[char]; start: Natural): bool =
     if text[i + start] != substr[i]: return false
   result = true
 
-func find*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+func find*(text, pattern: openArray[char]; start = 0.Natural, last: Natural): Option[Natural] =
   for i in start..last:
     if text.continuesWith(pattern, i):
-      return i
-  result = -1
+      return some i
+  result = none Natural
 
-func find*(text, pattern: openArray[char]; start = 0.Natural): int =
+func find*(text, pattern: openArray[char]; start = 0.Natural): Option[Natural] =
   find(text, pattern, start, text.len - pattern.len)
 
 func toLowerAscii*(c: char): char =
@@ -48,52 +51,51 @@ func continuesWith*(text, substr: openArray[char]; start: Natural; cmp: proc): b
     if not cmp(text[i + start], substr[i]): return false
   result = true
 
-func findI*(text, pattern: openArray[char], start = 0.Natural, last: Natural): int =
+func findI*(text, pattern: openArray[char]; start = 0.Natural, last: Natural): Option[Natural] =
   for i in start..last:
     if text.continuesWith(pattern, i, cmpInsensitive):
-      return i
-  result = -1
+      return some i
+  result = none Natural
 
-func findI*(text, pattern: openArray[char], start = 0.Natural): int =
+func findI*(text, pattern: openArray[char], start = 0.Natural): Option[Natural] =
   findI(text, pattern, start, text.len - pattern.len)
 
-func preceedsWith*(text, substr: openArray[char], last: Natural): bool =
+func preceedsWith*(text, substr: openArray[char]; last: Natural): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
   for i in substr.low..substr.high:
     if text[last - i] != substr[^(i + 1)]: return false
   result = true
 
-func rfind*(text, pattern: openArray[char], start, last: int): int =
-  let last = if last == -1: text.high else: last
+func rfind*(text, pattern: openArray[char]; start, last: Natural): Option[Natural] =
   for i in countdown(last, start):
     if text.preceedsWith(pattern, i):
-      return i
-  result = -1
+      return some i
+  result = none Natural
 
-func rfind*(text, pattern: openArray[char], start: int): int =
+func rfind*(text, pattern: openArray[char]; start: Natural): Option[Natural] =
   rfind(text, pattern, start, text.high)
-func rfind*(text, pattern: openArray[char], last: int): int =
+func rfind*(text, pattern: openArray[char]; last: Natural): Option[Natural] =
   rfind(text, pattern, pattern.high, last)
-func rfind*(text, pattern: openArray[char]): int =
+func rfind*(text, pattern: openArray[char]): Option[Natural] =
   rfind(text, pattern, pattern.high, text.high)
 
-func preceedsWith*(text, substr: openArray[char], last: Natural, cmp: proc): bool =
+func preceedsWith*(text, substr: openArray[char]; last: Natural; cmp: proc): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
   for i in substr.low..substr.high:
     if not cmp(text[last - i], substr[^(i + 1)]): return false
   result = true
 
-func rfindI*(text, pattern: openArray[char], start, last: int): int =
+func rfindI*(text, pattern: openArray[char], start, last: Natural): Option[Natural] =
   for i in countdown(last, start):
     if text.preceedsWith(pattern, i, cmpInsensitive):
-      return i
-  result = -1
+      return some i
+  result = none Natural
 
-func rfindI*(text, pattern: openArray[char], start: int): int =
+func rfindI*(text, pattern: openArray[char], start: Natural): Option[Natural] =
   rfindI(text, pattern, start, text.high)
-func rfindI*(text, pattern: openArray[char], last: int): int =
+func rfindI*(text, pattern: openArray[char], last: Natural): Option[Natural] =
   rfindI(text, pattern, pattern.high, last)
-func rfindI*(text, pattern: openArray[char]): int =
+func rfindI*(text, pattern: openArray[char]): Option[Natural] =
   rfindI(text, pattern, pattern.high, text.high)
 
 func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
@@ -102,9 +104,9 @@ func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.}
       if c in chars: return true
   result = false
 
-func find*(text: openArray[char], patterns: openArray[string], start: sink Natural = 0, last: sink int = -1): seq[int] =
+func find*(text: openArray[char], patterns: openArray[string], start: sink Natural = 0, last: sink int = -1): seq[Natural] =
   ## Patterns must match in order
-  result = newSeqOfCap[int](patterns.len)
+  result = newSeqOfCap[Natural](patterns.len)
   let sensitive = patterns.containsAny({'A'..'Z'})
   for pattern in patterns:
     if pattern.len == 0:
@@ -116,15 +118,15 @@ func find*(text: openArray[char], patterns: openArray[string], start: sink Natur
     let where = if sensitive: text.find(pattern, start, last)
                         else: text.findI(pattern, start, last)
 
-    if where == -1: return @[]
-    result.add where
-    start = where + pattern.len
+    if where.isNone: return @[]
+    result.add where.unsafeGet
+    start = where.unsafeGet + pattern.len
 
 func continuesWithB(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant
   substr.len + start > text.len and continuesWith(text, substr, start)
 
-func findAll*(text, pattern: openArray[char]): seq[int] =
+func findAll*(text, pattern: openArray[char]): seq[Natural] =
   ## Find all matches in any order
   if unlikely pattern.len == 0: return @[]
   var i = text.low
@@ -135,9 +137,9 @@ func findAll*(text, pattern: openArray[char]): seq[int] =
     else:
       inc(i)
 
-func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[int]] =
+func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[Natural]] =
   ## Find all matches in any order for all patterns in a single pass
-  result = newSeq[seq[int]](patterns.len)
+  result = newSeq[seq[Natural]](patterns.len)
   for i in text.low..text.high:
     for j, pattern in patterns:
       if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and

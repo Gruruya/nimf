@@ -90,7 +90,10 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if '/' in patterns[i]:
       filenameSep = i
       break
-  var lastSep = path.string.rfind("/", last = path.string.high - 1)
+  let maybeSep = path.string.rfind("/", last = path.string.high - 1)
+  let lastSep =
+    if maybeSep.isSome: maybeSep.unsafeGet
+    else: 0
 
   result = newSeq[(int, int)](patterns.len)
   var last = path.string.high
@@ -113,8 +116,9 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
           if j < 0: break
           elif patterns[j].len == 0: dec j; continue
 
-          let found = smartrfind(path.string, patterns[j], start = if i > filenameSep: lastSep else: 0, last)
-          if found == -1: return @[]
+          let maybeFound = smartrfind(path.string, patterns[j], start = if i > filenameSep: lastSep else: 0, last)
+          if maybeFound.isNone: return @[]
+          let found = maybeFound.unsafeGet
 
           result[i][0] = found - patterns[j].high
           last = result[i][0] - 1
@@ -131,8 +135,9 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
                 if result[i][1] == 0: result[i][1] = found
                 dec j
       else:
-        result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
-        if result[i][1] == -1: return @[]
+        let found = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+        if found.isNone: return @[]
+        result[i][1] = found.unsafeGet
         result[i][0] = result[i][1] - pattern.high
         last = result[i][0] - 1
 
