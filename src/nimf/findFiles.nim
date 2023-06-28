@@ -90,10 +90,7 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if '/' in patterns[i]:
       filenameSep = i
       break
-  let maybeSep = path.string.rfind("/", last = path.string.high - 1)
-  let lastSep =
-    if maybeSep.isSome: maybeSep.unsafeGet
-    else: 0
+  let lastSep = path.string.rfind("/", last = path.string.high - 1).get(0)
 
   result = newSeq[(int, int)](patterns.len)
   var last = path.string.high

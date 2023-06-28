@@ -150,10 +150,7 @@ proc styleForPath(lsc: LSColors, found: Found): Style {.inline.} =
 
 proc display(found: Found, patterns: seq[string], colors: LSColors) =
   let path = found.path.string
-  let maybeParentLen = path.rfind("/", last = path.high - 1)
-  let parentLen =
-    if maybeParentLen.isSome: maybeParentLen.unsafeGet.int
-    else: -1
+  let parentLen = cast[Option[int]](path.rfind("/", last = path.high - 1)).get(-1)
 
   let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle())
   let fileColor =
