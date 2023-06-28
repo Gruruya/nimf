@@ -63,15 +63,19 @@ func preceedsWith*(text, substr: openArray[char], last: Natural): bool =
     if text[last - i] != substr[^(i + 1)]: return false
   result = true
 
-func rfind*(text, pattern: openArray[char], start: int, last = -1): int =
+func rfind*(text, pattern: openArray[char], start, last: int): int =
   let last = if last == -1: text.high else: last
   for i in countdown(last, start):
     if text.preceedsWith(pattern, i):
       return i
   result = -1
 
-func rfind*(text, pattern: openArray[char], last = -1): int =
+func rfind*(text, pattern: openArray[char], start: int): int =
+  text.rfind(pattern, start, text.high)
+func rfind*(text, pattern: openArray[char], last: int): int =
   text.rfind(pattern, pattern.high, last)
+func rfind*(text, pattern: openArray[char]): int =
+  text.rfind(pattern, pattern.high, text.high)
 
 func preceedsWith*(text, substr: openArray[char], last: Natural, cmp: proc): bool =
   ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
@@ -79,15 +83,18 @@ func preceedsWith*(text, substr: openArray[char], last: Natural, cmp: proc): boo
     if not cmp(text[last - i], substr[^(i + 1)]): return false
   result = true
 
-func rfindI*(text, pattern: openArray[char], start: int, last = -1): int =
-  let last = if last == -1: text.high else: last
+func rfindI*(text, pattern: openArray[char], start, last: int): int =
   for i in countdown(last, start):
     if text.preceedsWith(pattern, i, cmpInsensitive):
       return i
   result = -1
 
-func rfindI*(text, pattern: openArray[char], last = -1): int =
+func rfindI*(text, pattern: openArray[char], start: int): int =
+  text.rfindI(pattern, start, text.high)
+func rfindI*(text, pattern: openArray[char], last: int): int =
   text.rfindI(pattern, pattern.high, last)
+func rfindI*(text, pattern: openArray[char]): int =
+  text.rfindI(pattern, pattern.high, text.high)
 
 func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
   for string in strings:
@@ -138,6 +145,17 @@ func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[int]]
       if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and
          text.continuesWithB(pattern, i):
            result[j].add i
+
+func split*(text: openArray[char], separators: set[char]): seq[seq[char]] =
+  ## Split a string at every separator
+  var start = 0
+  for i in 0 ..< text.high:
+    if text[i] in separators:
+      result.add text[start ..< i]
+      start = i + 1
+  if text[^1] in separators:
+        result.add text[start ..< text.high]
+  else: result.add text[start .. text.high]
 
 # Workaround for `system.find`
 template find*(text: openArray[char], pattern: string): int = find(text, pattern, 0)

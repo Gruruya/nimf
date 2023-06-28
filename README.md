@@ -8,7 +8,7 @@ Usage
 Usage:
   f [optional-params] [input: string...]
 
-Entered `input` may be a pattern OR a path/path glob to search.
+Entered `input` may be a pattern OR a path to search.
 Append `/` to the end of your pattern to search for directories.
 
 Options:

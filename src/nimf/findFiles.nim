@@ -18,7 +18,6 @@
 ## File path finding
 
 import ./find, std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
-export Path
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc `&=`(x: var Path; y: char) {.inline.} = x = Path(x.string & y)
@@ -79,43 +78,8 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 
 var findings = Findings.init()
 
-proc globFind*(path: Path; pattern: openArray[char]; h: var int): (int, int) =
-  var globbing = false
-  var j = pattern.high
-  while j >= 0:
-    if globbing:
-      while true:
-        if path.string[h] == pattern[j]:
-          if j == 0 and (h > 0 and path.string[h] != '/' and path.string[h - 1] != '/'): return (-1, -1)
-          globbing = false
-          if result[1] == 0: result[1] = h
-          dec h
-          dec j
-          break
-        elif path.string[h] == '/':
-          if j < 0: break
-          else: return (-1, -1)
-        else:
-          dec h
-          if h < 0:
-            if j < 0: break
-            else: return (-1, -1)
-    else:
-      globbing = pattern[j] == '*'
-      if globbing: dec j
-      elif path.string[h] != pattern[j]:
-        return (-1, -1)
-      else:
-        if j == 0 and (h > 0 and path.string[h] != '/' and path.string[h - 1] != '/'): return (-1, -1)
-        if result[1] == 0: result[1] = h
-        dec h
-        dec j
-        if h < 0: return (-1, -1)
-  result[0] = h + 1
-
 proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
-  ## Also has `*` globbing
   if patterns.len == 0: return @[]
 
   var filenameSep = -1
@@ -138,15 +102,10 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if pattern.len == 0:
       result[i] = (0, 0)
     else:
-      let glob = '*' in pattern
-      if glob:
-        result[i] = globFind(path, pattern, last)
-        if result[i] == (-1, -1): return @[]
-      else:
-        result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
-        if result[i][1] == -1: return @[]
-        result[i][0] = result[i][1] - pattern.high
-        last = result[i][0] - 1
+      result[i][1] = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+      if result[i][1] == -1: return @[]
+      result[i][0] = result[i][1] - pattern.high
+      last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)
