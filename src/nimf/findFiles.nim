@@ -120,17 +120,16 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
           result[i][0] = found - patterns[j].high
           last = result[i][0] - 1
 
-          if j notin {patterns.high, patterns.low}:
-            dec j
+          if j == patterns.low:
+            if pattern[0] in {'*', '/'} or result[i][0] == 0 or path.string[last] == '/':
+              if result[i][1] == 0: result[i][1] = found
+              break
+          elif j == patterns.high:
+            if pattern[^1] in {'*', '/'} or path.string[found + 1] == '/' or found == path.string.high:
+              if result[i][1] == 0: result[i][1] = found
+              dec j
           else:
-            if j == patterns.low:
-              if pattern[0] in {'*', '/'} or result[i][0] == 0 or path.string[last] == '/':
-                if result[i][1] == 0: result[i][1] = found
-                break
-            else:
-              if pattern[^1] in {'*', '/'} or path.string[found + 1] == '/' or found == path.string.high:
-                if result[i][1] == 0: result[i][1] = found
-                dec j
+            dec j
       else:
         let found = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
         if found.isNone: return @[]
