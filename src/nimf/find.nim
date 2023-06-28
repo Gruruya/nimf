@@ -124,7 +124,7 @@ func find*(text: openArray[char], patterns: openArray[string], start: sink Natur
 
 func continuesWithB(text, substr: openArray[char], start: Natural): bool =
   ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant
-  substr.len + start > text.len and continuesWith(text, substr, start)
+  substr.len + start <= text.len and continuesWith(text, substr, start)
 
 func findAll*(text, pattern: openArray[char]): seq[Natural] =
   ## Find all matches in any order
