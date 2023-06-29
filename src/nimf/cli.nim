@@ -24,7 +24,7 @@ import ./[find, findFiles],
 import pkg/lscolors except parseLsColors, LsColors
 import std/os except getCurrentDir
 import std/terminal except Style
-from std/strutils import startsWith, multiReplace
+from std/strutils import startsWith
 from std/sequtils import anyIt, mapIt
 from std/typetraits import enumLen
 
@@ -204,6 +204,36 @@ proc stripExtension(path: Path): Path =
     else: discard
   result = path
 
+func kwayMerge[T](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
+  ## k-way merge, lower overhead and less efficient than priority queue
+  if likely seqOfSeqs.len >= 0:
+    var indices = newSeq[int](seqOfSeqs.len)
+    while true:
+      var minIdx: Natural
+      var first = true
+      for i in 0.Natural..seqOfSeqs.high:
+        if indices[i] <= seqOfSeqs[i].high and (first or seqOfSeqs[i][indices[i]] < seqOfSeqs[minIdx][indices[minIdx]]):
+          minIdx = i
+          first = false
+      if first: break
+      result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
+      inc indices[minIdx]
+
+func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; targets: openArray[tuple[index, which: Natural]]): string =
+  var start = text.low
+  for target in targets:
+    result &= text[start ..< target.index]
+    result &= replacements[target.which].by
+    start = target.index + replacements[target.which].sub.len
+  if start <= text.high:
+    result &= text[start .. text.high]
+
+func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; targets: openArray[seq[Natural]]): string {.inline.} =
+  replaceAt(text, replacements, targets.kwayMerge)
+
+func replaceAt[T: enum](text: string; replacements: array[T, string]; targets: openArray[seq[Natural]]): string {.inline.} =
+  replaceAt(text, T.mapIt(($it, replacements[it])), targets)
+
 proc run(cmds: seq[string], findings: seq[Found]) =
   ## Run the commands on the findings
   type Target = enum
@@ -237,22 +267,22 @@ proc run(cmds: seq[string], findings: seq[Found]) =
       let allIndexes = cmd.findAll(Target.mapIt($it))
       if cmd.endsWith "+":
         let cmd = cmd[0..^2]
-        var replacements = newSeq[(string, string)]()
+        var replacements: array[Target, string]
         for t in Target:
           if allIndexes[ord(t)].len > 0:
-            replacements.add ($t, getReplacementJoined(t, findings))
-        if replacements.len == 0:
+            replacements[t] = getReplacementJoined(t, findings)
+        if replacements == default(typeof replacements):
               m.spawn run cmd & ' ' & getReplacementJoined(toPaths, findings)
-        else: m.spawn run cmd.multiReplace(replacements) #TODO: Use indexes from `findAll` instead of searching again
+        else: m.spawn run cmd.replaceAt(replacements, allIndexes)
       else:
         for i in findings.low..findings.high:
-          var replacements = newSeqOfCap[(string, string)](Target.enumLen)
+          var replacements: array[Target, string]
           for t in Target:
             if allIndexes[ord(t)].len > 0:
-              replacements.add ($t, getReplacement(t, findings)[i])
-          if replacements.len == 0:
+              replacements[t] = getReplacement(t, findings)[i]
+          if replacements == default(typeof replacements):
                 m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
-          else: m.spawn run cmd.multiReplace(replacements)
+          else: m.spawn run cmd.replaceAt(replacements, allIndexes)
 
 # `options.Option` but also stores the input so we can negate flags without values like `-c`
 type Flag[T] = object
