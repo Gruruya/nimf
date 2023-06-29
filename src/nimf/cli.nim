@@ -205,7 +205,7 @@ proc stripExtension(path: Path): Path =
   result = path
 
 func kwayMerge[T](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
-  ## k-way merge, lower overhead and less efficient than priority queue
+  ## k-way merge, flattens and sorts `seqOfSeqs`. Assumes each `seq[T]` is in order.
   if likely seqOfSeqs.len >= 0:
     var indices = newSeq[int](seqOfSeqs.len)
     while true:
