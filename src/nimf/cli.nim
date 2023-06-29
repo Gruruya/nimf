@@ -228,12 +228,6 @@ func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; ta
   if start <= text.high:
     result &= text[start .. text.high]
 
-func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; targets: openArray[seq[Natural]]): string {.inline.} =
-  replaceAt(text, replacements, targets.kwayMerge)
-
-func replaceAt[T: enum](text: string; replacements: array[T, string]; targets: openArray[seq[Natural]]): string {.inline.} =
-  replaceAt(text, T.mapIt(($it, replacements[it])), targets)
-
 proc run(cmds: seq[string], findings: seq[Found]) =
   ## Run the commands on the findings
   type Target = enum
@@ -273,7 +267,7 @@ proc run(cmds: seq[string], findings: seq[Found]) =
             replacements[t] = getReplacementJoined(t, findings)
         if replacements == default(typeof replacements):
               m.spawn run cmd & ' ' & getReplacementJoined(toPaths, findings)
-        else: m.spawn run cmd.replaceAt(replacements, allIndexes)
+        else: m.spawn run cmd.replaceAt(Target.mapIt(($it, replacements[it])), allIndexes.kwayMerge)
       else:
         for i in findings.low..findings.high:
           var replacements: array[Target, string]
@@ -282,7 +276,7 @@ proc run(cmds: seq[string], findings: seq[Found]) =
               replacements[t] = getReplacement(t, findings)[i]
           if replacements == default(typeof replacements):
                 m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
-          else: m.spawn run cmd.replaceAt(replacements, allIndexes)
+          else: m.spawn run cmd.replaceAt(Target.mapIt(($it, replacements[it])), allIndexes.kwayMerge)
 
 # `options.Option` but also stores the input so we can negate flags without values like `-c`
 type Flag[T] = object
