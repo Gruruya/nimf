@@ -204,7 +204,7 @@ proc stripExtension(path: Path): Path =
     else: discard
   result = path
 
-func kwayMerge[T](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
+func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
   ## k-way merge, flattens and sorts (ascending) `seqOfSeqs`. Assumes each `seq[T]` is sorted.
   if likely seqOfSeqs.len >= 0:
     var indices = newSeq[int](seqOfSeqs.len)
