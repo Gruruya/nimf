@@ -97,12 +97,12 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
-func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; targets: openArray[tuple[index, which: Natural]]): string =
+func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; placements: openArray[tuple[where, which: Natural]]): string =
   var start = text.low
-  for target in targets:
-    result &= text[start ..< target.index]
+  for target in placements:
+    result &= text[start ..< target.where]
     result &= replacements[target.which].by
-    start = target.index + replacements[target.which].sub.len
+    start = target.where + replacements[target.which].sub.len
   if start <= text.high:
     result &= text[start .. text.high]
 
