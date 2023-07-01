@@ -97,7 +97,8 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
-func replaceAt(text: string; replacements: openArray[tuple[sub, by: string]]; placements: openArray[tuple[where, which: Natural]]): string =
+func replaceAt(text: string; placements: openArray[tuple[where, which: Natural]]; replacements: openArray[tuple[sub, by: string]]): string =
+  ## Replaces at each `placements.where` index the `replacements[placements.which].sub` text with `by`
   var start = text.low
   for target in placements:
     result &= text[start ..< target.where]
@@ -137,6 +138,7 @@ proc run(cmds: seq[string], findings: seq[Found]) =
   m.awaitAll:
     for cmd in cmds:
       let allIndexes = cmd.findAll(Target.mapIt($it))
+      let placements = allIndexes.kwayMerge
       if cmd.endsWith "+":
         let cmd = cmd[0..^2]
         var replacements: array[Target, string]
@@ -145,7 +147,7 @@ proc run(cmds: seq[string], findings: seq[Found]) =
             replacements[t] = getReplacementJoined(t, findings)
         if replacements == default(typeof replacements):
               m.spawn run cmd & ' ' & getReplacementJoined(toPaths, findings)
-        else: m.spawn run cmd.replaceAt(Target.mapIt(($it, replacements[it])), allIndexes.kwayMerge)
+        else: m.spawn run cmd.replaceAt(placements, Target.mapIt(($it, replacements[it])))
       else:
         for i in findings.low..findings.high:
           var replacements: array[Target, string]
@@ -154,7 +156,7 @@ proc run(cmds: seq[string], findings: seq[Found]) =
               replacements[t] = getReplacement(t, findings)[i]
           if replacements == default(typeof replacements):
                 m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
-          else: m.spawn run cmd.replaceAt(Target.mapIt(($it, replacements[it])), allIndexes.kwayMerge)
+          else: m.spawn run cmd.replaceAt(placements, Target.mapIt(($it, replacements[it])))
 
 # `options.Option` but also stores the input so we can negate flags without values like `-c`
 type Flag[T] = object
