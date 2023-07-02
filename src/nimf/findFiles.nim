@@ -22,7 +22,7 @@ from std/strutils import split
 from std/sequtils import filterIt
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
-proc `&=`(x: var Path; y: char) {.inline.} = x = Path(x.string & y)
+proc add(x: var Path; y: char) {.inline.} = x.string.add y
 proc hash(x: Path): Hash {.inline, borrow.}
 
 type
