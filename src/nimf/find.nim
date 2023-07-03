@@ -143,8 +143,8 @@ func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[Natur
          text.continuesWith(pattern, i):
            result[j].add i
 
-func endsWith*(s, suffix: openArray[char]): bool {.inline.} =
-  s.high >= suffix.high and s.preceedsWith(suffix, s.high)
+func endsWith*(text, suffix: openArray[char]): bool {.inline.} =
+  suffix.high <= text.high and text.preceedsWith(suffix, text.high)
 
 # Workaround for `system.find`
 template find*(text: openArray[char], pattern: string): Option[Natural] = find(text, pattern, 0)
