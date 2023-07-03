@@ -15,7 +15,7 @@ Options:
   -h, --help                            print this cligen-erated help
   --help-syntax                         advanced: prepend,plurals,..
   -c=, --color=         bool     ?      set color
-  -e=, --exec=          strings  {}     Execute a command for each matching search result in parallel.
+  -e=, --execute=       strings  {}     Execute a command for each matching search result in parallel.
                                         Alternatively, end this argument with "+" to execute the command once with all results as arguments.
                                         Example: f .nim -e "$EDITOR"+
                                         The following placeholders are substituted before the command is executed:

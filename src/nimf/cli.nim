@@ -177,7 +177,7 @@ proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
   assert self.isSome
   result = self.val
 
-proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false, input: seq[string]): int =
+proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = false, input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
 
@@ -207,7 +207,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false
 
   let findings = traverseFind(paths, patterns, followSymlinks = followSymlinks)
 
-  if exec.len == 0:
+  if execute.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
     let displayColor = color.isNone and envColorEnabled or
                        color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
@@ -219,7 +219,7 @@ proc cliFind*(color = none bool, exec = newSeq[string](), followSymlinks = false
       for found in findings:
         echo found.path.string
   else:
-    run(exec, findings)
+    run(execute, findings)
 
 # Special argument parsing
 proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
@@ -236,7 +236,7 @@ proc f*() =
                             "Append `/` to the end of your pattern to search for directories.\n" &
                             "\nOptions:\n$options",
                     short = {"followSymlinks": 'L'},
-                    help = {"exec": "Execute a command for each matching search result in parallel.\n" &
+                    help = {"execute": "Execute a command for each matching search result in parallel.\n" &
                                     "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                                     "Example: f .nim -e \"$EDITOR\"+\n" &
                                     "The following placeholders are substituted before the command is executed:\n" &
