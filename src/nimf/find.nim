@@ -122,10 +122,6 @@ func find*(text: openArray[char], patterns: openArray[string], start: sink Natur
     result.add where.unsafeGet
     start = where.unsafeGet + pattern.len
 
-func continuesWithB(text, substr: openArray[char], start: Natural): bool =
-  ## Checks if `substr` is in `text` starting at `start`, bounds-checking variant
-  substr.len + start <= text.len and continuesWith(text, substr, start)
-
 func findAll*(text, pattern: openArray[char]): seq[Natural] =
   ## Find all matches in any order
   if unlikely pattern.len == 0: return @[]
@@ -142,8 +138,9 @@ func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[Natur
   result = newSeq[seq[Natural]](patterns.len)
   for i in text.low..text.high:
     for j, pattern in patterns:
-      if (result[j].len == 0 or i >= result[j][^1] + pattern.len) and
-         text.continuesWithB(pattern, i):
+      if pattern.len + i <= text.len and
+         (result[j].len == 0 or result[j][^1] + pattern.len <= i) and
+         text.continuesWith(pattern, i):
            result[j].add i
 
 func endsWith*(s, suffix: openArray[char]): bool {.inline.} =
