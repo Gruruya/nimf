@@ -150,5 +150,5 @@ func endsWith*(s, suffix: openArray[char]): bool {.inline.} =
   s.high >= suffix.high and s.preceedsWith(suffix, s.high)
 
 # Workaround for `system.find`
-template find*(text: openArray[char], pattern: string): int = find(text, pattern, 0)
-template find*(text: string, patterns: openArray[string]): seq[int] = find(text, patterns, 0)
+template find*(text: openArray[char], pattern: string): Option[Natural] = find(text, pattern, 0)
+template find*(text: string, patterns: openArray[string]): seq[Natural] = find(text, patterns, 0)
