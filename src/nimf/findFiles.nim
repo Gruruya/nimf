@@ -158,7 +158,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
           var s: Stat
           assert(path != Path "")
           result = (pcLinkToFile, true)
-          if stat(path.string, s) == 0'i32:
+          if stat(path.cstring, s) == 0'i32:
             if S_ISDIR(s.st_mode):
               result = (pcLinkToDir, false)
             elif S_ISREG(s.st_mode):

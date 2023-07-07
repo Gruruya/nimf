@@ -66,8 +66,8 @@ proc display(found: Found, patterns: seq[string], colors: LSColors) =
 
 template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
-    var i{.inject, used.}: int;
-    var it{.inject.}: typeof(items(collection), typeOfIter);
+    var i {.inject.}: int;
+    var it {.inject.}: typeof(items(collection), typeOfIter);
     op), typeOfProc)
   var result = newSeqOfCap[OutType](collection.len)
   for i {.inject.}, it {.inject.} in collection:
@@ -160,8 +160,8 @@ proc run(cmds: seq[string], findings: seq[Found]) =
 
 # `options.Option` but also stores the input so we can negate flags without values like `-c`
 type Flag[T] = object
-  val: T
-  has: bool
+  val*: T
+  has*: bool
   input*: string
 proc some[T](val: sink T): Flag[T] {.inline.} =
   result.has = true
