@@ -219,7 +219,7 @@ proc f*() =
   dispatch(cliFind, cmdName = "f",
                     usage = (try: getAppFilename().lastPathPart except: "f") & " $args\n\n" &
                             "Entered `input` may be a pattern OR a path to search.\n" &
-                            "Append `/` to the end of your pattern to search for directories.\n" &
+                            "The pattern will only match with the filename unless you include a `/`.\n" &
                             "\nOptions:\n$options",
                     short = {"followSymlinks": 'L'},
                     help = {"execute": "Execute a command for each matching search result in parallel.\n" &
