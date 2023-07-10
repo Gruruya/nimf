@@ -14,7 +14,7 @@ Usage:
   f [optional-params] [input: string...]
 
 Entered `input` may be a pattern OR a path to search.
-Append `/` to the end of your pattern to search for directories.
+The pattern will only match with the filename unless you include a `/`.
 
 Options:
   -h, --help                            print this cligen-erated help
