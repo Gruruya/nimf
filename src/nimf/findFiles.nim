@@ -243,7 +243,8 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
           of plainPrint: print path.string
           of coloredPrint: print color(statFound(), patterns)
           of collect: findings.add statFound()
-        else: notFoundPrint()
+        elif behavior in {plainPrint, coloredPrint}:
+          notFoundPrint()
   case behavior
   of plainPrint, coloredPrint:
     if printQueue.len > 0: stdout.write printQueue
