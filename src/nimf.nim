@@ -200,6 +200,7 @@ proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = fa
       let colors = parseLSColorsEnv()
       for found in findings:
         stdout.write color(found, patterns, colors) & '\n'
+      stdout.write ansiResetCode; stdout.flushFile()
     else:
       for found in findings:
         echo found.path.string
