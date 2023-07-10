@@ -75,12 +75,9 @@ template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   result
 
 proc stripExtension(path: Path): Path =
-  for i in countDown(path.string.high, path.string.low):
-    case path.string[i]
-    of '/': break
-    of '.': return Path(path.string[0..<i])
-    else: discard
-  result = path
+  let dotPos = searchExtPos(path.string)
+  if dotPos == -1: path
+  else: Path(path.string[0 ..< dotPos])
 
 func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
   ## k-way merge, flattens and sorts (ascending) `seqOfSeqs`. Assumes each `seq[T]` is sorted.
