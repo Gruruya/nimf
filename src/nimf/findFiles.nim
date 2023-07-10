@@ -4,7 +4,7 @@
 
 ## File path finding, posix only currently as it uses stat.
 
-import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
+import ./[common, find, handling], std/[os, paths, locks, atomics, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -139,13 +139,24 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
         yield result
 
 var printQueue = newStringOfCap(8192)
+var numFailed: Atomic[int] # To print often even if there's a lot of filtering but few matches
 var printLock: Lock
+
+proc writePrintQueue() {.inline.} =
+  stdout.write printQueue
+  printQueue.setLen 0
+  numFailed.store(0)
+
 proc print(s: string) {.inline.} =
   withLock(printLock):
     printQueue.add s & '\n'
     if printQueue.len >= 8192:
-      stdout.write printQueue
-      printQueue.setLen 0
+      writePrintQueue()
+
+proc notFoundPrint() {.inline.} =
+  if ({.gcsafe.}: printQueue.len) > 0 and numFailed.fetchAdd(1) > 4096:
+    withLock(printLock):
+      writePrintQueue()
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption) {.gcsafe.} =
   let absolute = isAbsolute(dir)
@@ -174,6 +185,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         let found = path.findPath(patterns)
         if found.len > 0:
           wasFound()
+        elif behavior in {plainPrint, coloredPrint}:
+          notFoundPrint()
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       let path = format(descendent.path)
@@ -189,12 +202,16 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         let found = path.findPath(patterns)
         if found.len > 0:
           wasFound()
+        elif behavior in {plainPrint, coloredPrint}:
+          notFoundPrint()
 
     elif descendent.kind in kinds:
       let path = format(descendent.path)
       let found = path.findPath(patterns)
       if found.len > 0:
         wasFound()
+      elif behavior in {plainPrint, coloredPrint}:
+        notFoundPrint()
 
 proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
@@ -226,6 +243,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
           of plainPrint: print path.string
           of coloredPrint: print color(statFound(), patterns)
           of collect: findings.add statFound()
+        else: notFoundPrint()
   case behavior
   of plainPrint, coloredPrint:
     if printQueue.len > 0: stdout.write printQueue
