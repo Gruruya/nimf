@@ -72,6 +72,14 @@ proc `==`*(a, b: Color): bool =
     of ckFixed: a.ckFixedVal == b.ckFixedVal
     of ckRGB: a.ckRGBVal == b.ckRGBVal)
 
+proc toAnsiCode*(style: Style): string =
+  let fg = style.getForegroundColor()
+  if fg.isSome:
+    if style.font.bold:
+          "\e[1;" & $ord(fg.unsafeGet) & 'm'
+    else: "\e[0;" & $ord(fg.unsafeGet) & 'm'
+  else: ansiResetCode
+
 proc write*(f: File, style: Style, m: varargs[string]) =
   let fg = style.getForegroundColor()
   let bg = style.getBackgroundColor()

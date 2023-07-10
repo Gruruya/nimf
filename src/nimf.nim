@@ -11,19 +11,23 @@ from   std/strutils import startsWith
 from   std/sequtils import anyIt, mapIt
 from   std/typetraits import enumLen
 
-proc display(found: Found, patterns: seq[string], colors: LSColors) =
+template add(x: var string, y: varargs[string]) =
+  for j in y:
+    system.add(x, j)
+
+proc color(found: Found, patterns: seq[string], colors: LSColors): string =
   #TODO: Improve performance
-  let path = found.path.string
+  template path: untyped = found.path.string
   let parentLen = cast[Option[int]](path.rfind("/", last = path.high - 1)).get(-1)
 
-  let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle())
+  let dirColor = getOrDefault(colors.types, etDirectory, defaultStyle()).toAnsiCode
   let fileColor =
     if found.kind == pcDir: dirColor # optimization
-    else: colors.styleForPath(found)
+    else: colors.styleForPath(found).toAnsiCode
 
   if patterns == @[""]:
-    stdout.write dirColor, path[0..parentLen]
-    stdout.write fileColor, path[parentLen + 1..^1]
+    result = dirColor & path[0..parentLen]
+    result.add fileColor, path[parentLen + 1..^1]
   else:
     var start = 0
     for i in 0..found.matches.high:
@@ -31,24 +35,22 @@ proc display(found: Found, patterns: seq[string], colors: LSColors) =
       let matchEnd = found.matches[i][1]
 
       if start > parentLen:
-        stdout.write fileColor, path[start ..< matchStart]
+        result.add fileColor, path[start ..< matchStart]
       elif dirColor != fileColor and matchStart >= parentLen:
-        stdout.write dirColor, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
-        stdout.write fileColor, path[parentLen + 1 ..< matchStart]
+        result.add dirColor, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
+        result.add fileColor, path[parentLen + 1 ..< matchStart]
       else:
-        stdout.write dirColor, path[start ..< matchStart]
+        result.add dirColor, path[start ..< matchStart]
 
-      stdout.styledWrite styleBright, fgRed, path[matchStart..matchEnd]
+      result.add "\e[1;" & $ord(fgRed) & 'm', path[matchStart..matchEnd]
       start = matchEnd + 1
 
     if start != path.len:
       if start > parentLen or dirColor == fileColor:
-        stdout.write fileColor, path[start..path.high]
+        result.add fileColor, path[start..path.high]
       else:
-        stdout.write dirColor, path[start .. parentLen]
-        stdout.write fileColor, path[parentLen + 1 .. path.high]
-
-  stdout.write '\n'
+        result.add dirColor, path[start .. parentLen]
+        result.add fileColor, path[parentLen + 1 .. path.high]
 
 template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
@@ -197,7 +199,7 @@ proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = fa
     if displayColor:
       let colors = parseLSColorsEnv()
       for found in findings:
-        display(found, patterns, colors)
+        stdout.write color(found, patterns, colors) & '\n'
     else:
       for found in findings:
         echo found.path.string
