@@ -4,22 +4,13 @@
 
 ## File path finding, posix only currently as it uses stat.
 
-import ./find, std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
+import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
 proc hash(x: Path): Hash {.inline, borrow.}
 
 type
-  Found* = object
-    path*: Path
-    matches*: seq[(int, int)]
-    case kind*: PathComponent
-    of pcFile:
-      stat*: Stat
-    of pcLinkToFile:
-      broken*: bool
-    else: discard
   File = object
     path*: Path
     case kind*: PathComponent
@@ -147,8 +138,16 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
 
         yield result
 
+var printQueue = newStringOfCap(8192)
+var printLock: Lock
+proc print(s: string) {.inline.} =
+  withLock(printLock):
+    printQueue.add s & '\n'
+    if printQueue.len >= 8192:
+      stdout.write printQueue
+      printQueue.setLen 0
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDirStat(relative = not absolute):
     template format(path: Path): Path =
@@ -159,16 +158,22 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if absolute: path
       else: absolutePath(path)
 
+    template wasFound =
+      case behavior
+      of plainPrint: print path.string
+      of coloredPrint: print ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns))
+      of collect: findings.add descendent.toFound(path, matches = found)
+
     if descendent.kind == pcDir:
       var path = format(descendent.path) & '/'
       if followSymlinks:
         let absPath = path.absolute
         if findings.seenOrIncl absPath: continue
-      m.spawn findDirRec(m, path, patterns, kinds, followSymlinks)
+      m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior)
       if pcDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          findings.add descendent.toFound(path, matches = found)
+          wasFound()
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       let path = format(descendent.path)
@@ -178,41 +183,50 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
       if not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks)
+        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior)
 
       if pcLinkToDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          findings.add descendent.toFound(path, matches = found)
+          wasFound()
 
     elif descendent.kind in kinds:
       let path = format(descendent.path)
       let found = path.findPath(patterns)
       if found.len > 0:
-        findings.add descendent.toFound(path, matches = found)
+        wasFound()
 
 proc stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false): seq[Found] =
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: runOption): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks)
+        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior)
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          case info.kind
-          of pcFile:
-            var s: Stat
-            if lstat(cstring path.string, s) < 0'i32: continue
-            result.add Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
-          of pcLinkToFile:
-            var s: Stat
-            let broken = stat(cstring path.string, s) < 0'i32
-            result.add Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
-          else: result.add Found(path: path.stripDot, kind: info.kind, matches: found)
-  result &= findings.found.paths
+          template statFound: Found =
+            case info.kind
+            of pcFile:
+              var s: Stat
+              if lstat(cstring path.string, s) < 0'i32: continue
+              Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
+            of pcLinkToFile:
+              var s: Stat
+              let broken = stat(cstring path.string, s) < 0'i32
+              Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
+            else:
+              Found(path: path.stripDot, kind: info.kind, matches: found)
+          case behavior
+          of plainPrint: print path.string
+          of coloredPrint: print color(statFound(), patterns)
+          of collect: findings.add statFound()
+  case behavior
+  of plainPrint, coloredPrint:
+    if printQueue.len > 0: stdout.write printQueue
+  of collect: result &= findings.found.paths

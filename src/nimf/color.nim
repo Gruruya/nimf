@@ -5,7 +5,7 @@
 ## Color support for the CLI, parsed from `LS_COLORS`
 #TODO: Replace lscolors package
 import pkg/lscolors/[stdlibterm, style, entrytypes],
-       ./[find, findFiles],
+       ./[common, find],
        std/[options, posix, os, tables], adix/lptabz
 import pkg/lscolors except parseLsColors, LsColors
 import std/terminal except Style
