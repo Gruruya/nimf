@@ -5,7 +5,7 @@
 ## The CLI interface for nimf
 import ./nimf/[common, find, findFiles, color, handling],
        pkg/[cligen, cligen/argcvt, malebolgia],
-       std/[paths, tables, terminal]
+       std/[paths, tables, terminal, exitprocs]
 import std/os except getCurrentDir
 from   std/strutils import startsWith
 from   std/sequtils import anyIt, mapIt
@@ -199,8 +199,9 @@ proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = fa
                        color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
     if displayColor:
       lscolors = parseLSColorsEnv()
+      exitprocs.addExitProc(resetAttributes)
       discard traverse(coloredPrint)
-      stdout.write ansiResetCode; stdout.flushFile()
+      stdout.flushFile()
     else:
       discard traverse(plainPrint)
   else:
