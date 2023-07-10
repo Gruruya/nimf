@@ -5,8 +5,6 @@
 ## File path finding, posix only currently as it uses stat.
 
 import ./find, std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
-from std/strutils import split
-from std/sequtils import filterIt
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -67,7 +65,7 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 
 var findings = Findings.init()
 
-proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
+proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
   if patterns.len == 0: return @[]
 
