@@ -154,7 +154,7 @@ proc print(s: string) {.inline.} =
       writePrintQueue()
 
 proc notFoundPrint() {.inline.} =
-  if ({.gcsafe.}: printQueue.len) > 0 and numFailed.fetchAdd(1) > 4096:
+  if ({.gcsafe.}: printQueue.len) > 0 and numFailed.fetchAdd(1) > 16384:
     withLock(printLock):
       writePrintQueue()
 
