@@ -69,7 +69,6 @@ var findings = Findings.init()
 
 proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
-  ## Also has `*` globbing
   if patterns.len == 0: return @[]
 
   var filenameSep = -1
@@ -92,37 +91,11 @@ proc findPath*(path: sink Path; patterns: openArray[string]): seq[(int, int)] =
     if pattern.len == 0:
       result[i] = (0, 0)
     else:
-      let glob = '*' in pattern
-      if glob:
-        let patterns = pattern.split('*').filterIt(it.len > 0)
-        var j = patterns.high
-        while true:
-          if j < 0: break
-          elif patterns[j].len == 0: dec j; continue
-
-          let maybeFound = smartrfind(path.string, patterns[j], start = if i > filenameSep: lastSep else: 0, last)
-          if maybeFound.isNone: return @[]
-          let found = maybeFound.unsafeGet
-
-          result[i][0] = found - patterns[j].high
-          last = result[i][0] - 1
-
-          if j == patterns.low:
-            if pattern[0] in {'*', '/'} or result[i][0] == 0 or path.string[last] == '/':
-              if result[i][1] == 0: result[i][1] = found
-              break
-          elif j == patterns.high:
-            if pattern[^1] in {'*', '/'} or path.string[found + 1] == '/' or found == path.string.high:
-              if result[i][1] == 0: result[i][1] = found
-              dec j
-          else:
-            dec j
-      else:
-        let found = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
-        if found.isNone: return @[]
-        result[i][1] = found.unsafeGet
-        result[i][0] = result[i][1] - pattern.high
-        last = result[i][0] - 1
+      let found = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+      if found.isNone: return @[]
+      result[i][1] = found.unsafeGet
+      result[i][0] = result[i][1] - pattern.high
+      last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   var d = opendir(dir)
