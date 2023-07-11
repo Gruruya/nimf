@@ -233,7 +233,7 @@ proc f*() =
                               "\"{.}\":  path without file extension\n" &
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
-                              "If no placeholder is present, an implicit \"{}\" at the end is assumed."})
+                              "If no placeholder is present, an implicit \" {}\" at the end is assumed."})
 
 when isMainModule:
   f()
