@@ -88,23 +88,23 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
-func replaceAt[T: enum](text: string; placements: openArray[tuple[where: Natural, which: T]]; replacements: array[T, string]): string =
+func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, string]): string =
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum]`
   var start = text.low
   for target in placements:
     result &= text[start ..< target.where]
-    result &= replacements[target.which]
-    start = target.where + len($target.which)
+    result &= replacements[T(target.which)]
+    start = target.where + len($T(target.which))
   if start <= text.high:
     result &= text[start .. text.high]
 
-func replaceAt[T: enum](text: string; placements: openArray[tuple[where: Natural, which: T]]; replacements: array[T, seq[string]]; index: Natural): string =
+func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, seq[string]]; index: Natural): string =
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum][index]`
   var start = text.low
   for target in placements:
     result &= text[start ..< target.where]
-    result &= replacements[target.which][index]
-    start = target.where + len($target.which)
+    result &= replacements[T(target.which)][index]
+    start = target.where + len($T(target.which))
   if start <= text.high:
     result &= text[start .. text.high]
 
@@ -155,7 +155,7 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
             anyPlaceholders = true
         if not anyPlaceholders:
               m.spawn execShell cmd & ' ' & (needsJoined(toPaths, findings); replacementsJoined[toPaths])
-        else: m.spawn execShell cmd.replaceAt(cast[seq[(Natural, Target)]](placements), replacementsJoined)
+        else: m.spawn execShell cmd.replaceAt(placements, replacementsJoined)
       else:
         let anyPlaceholders = anyIt(allIndexes, it.len > 0)
         for i in findings.low..findings.high:
@@ -164,4 +164,4 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
               needs(t, findings)
           if not anyPlaceholders:
                 m.spawn execShell cmd & ' ' & (needs(toPaths, findings); replacements[toPaths][i])
-          else: m.spawn execShell cmd.replaceAt(cast[seq[(Natural, Target)]](placements), replacements, i)
+          else: m.spawn execShell cmd.replaceAt(placements, replacements, i)
