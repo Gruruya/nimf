@@ -89,7 +89,7 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       inc indices[minIdx]
 
 func replaceAt[T: enum](text: string; placements: openArray[tuple[where: Natural, which: Natural]]; replacements: array[T, string]): string =
-  ## Replaces at each `placements.where` index the `replacements[placements.which].sub` text with `by`
+  ## Replaces at each `placements.where` index the `enum` text with `replacements[enum]`
   var start = text.low
   for target in placements:
     result &= text[start ..< target.where]
@@ -99,7 +99,7 @@ func replaceAt[T: enum](text: string; placements: openArray[tuple[where: Natural
     result &= text[start .. text.high]
 
 func replaceAt[T: enum](text: string; placements: openArray[tuple[where: Natural, which: Natural]]; replacements: array[T, seq[string]]; index: Natural): string =
-  ## Replaces at each `placements.where` index the `replacements[placements.which].sub` text with `by`
+  ## Replaces at each `placements.where` index the `enum` text with `replacements[enum][index]`
   var start = text.low
   for target in placements:
     result &= text[start ..< target.where]
@@ -123,18 +123,17 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
   var replacements: array[Target, seq[string]]
   var replacementsJoined: array[Target, string]
 
-  template needs(t: Target, constructor: typed) =
-    if replacements[t].len == 0: replacements[t] = constructor
-
-  template needs(t: Target; findings: seq[Found]) =
-    needs(t,
+  template needs(t: Target, findings: seq[Found]) =
+    if replacements[t].len == 0: replacements[t] =
       case t
       of toPaths: mapIt(findings, it.path.string.quoteShell)
       of toFilenames: mapIt(findings, it.path.lastPathPart.string.quoteShell)
       of toParentDirs: mapIt(findings, it.path.parentDir.string.quoteShell)
       of toNoExtPaths: mapIt(findings, it.path.stripExtension.string.quoteShell)
-      of toNoExtFilenames: mapEnumeratedIt(findings, if it.kind == pcDir: needs(toFilenames, mapIt(findings, it.path.lastPathPart.string.quoteShell)); replacements[toFilenames][i]
-                                                     else: it.path.splitFile[1].string.quoteShell))
+      of toNoExtFilenames: mapEnumeratedIt(findings, if it.kind == pcDir:
+                                                       if replacements[toFilenames].len > 0: replacements[toFilenames][i]
+                                                       else: it.path.lastPathPart.string.quoteShell
+                                                     else: it.path.splitFile[1].string.quoteShell)
 
   template needsJoined(t: Target; findings: seq[Found]) =
     if replacementsJoined[t].len == 0:
