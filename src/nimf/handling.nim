@@ -88,25 +88,22 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
-func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, string]): string =
-  ## Replaces at each `placements.where` index the `enum` text with `replacements[enum]`
+template replaceAtImpl(indexing = false): untyped =
   var start = text.low
   for target in placements:
-    result &= text[start ..< target.where]
-    result &= replacements[T(target.which)]
+    result &= text[start ..< target.where] # Difference between the two is here ↓
+    result &= (when indexing: replacements[T(target.which)][index] else: replacements[T(target.which)])
     start = target.where + len($T(target.which))
   if start <= text.high:
     result &= text[start .. text.high]
 
+func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, string]): string =
+  ## Replaces at each `placements.where` index the `enum` text with `replacements[enum]`
+  replaceAtImpl()
+
 func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, seq[string]]; index: Natural): string =
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum][index]`
-  var start = text.low
-  for target in placements:
-    result &= text[start ..< target.where]
-    result &= replacements[T(target.which)][index]
-    start = target.where + len($T(target.which))
-  if start <= text.high:
-    result &= text[start .. text.high]
+  replaceAtImpl(indexing = true)
 
 proc run*(cmds: sink seq[string], findings: seq[Found]) =
   ## Run the commands on the findings
