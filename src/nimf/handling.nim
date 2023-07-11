@@ -127,7 +127,7 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
   template getReplacementJoined(t: Target; findings: seq[Found]): string =
     needs(replacementsJoinedStored[t], getReplacement(t, findings).join(" "))
 
-  proc run(cmd: string) = discard execShellCmd(cmd)
+  proc execShell(cmd: string) = discard execShellCmd(cmd)
   var m = createMaster()
   m.awaitAll:
     for cmd in cmds.mitems:
@@ -144,8 +144,8 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
             replacementPairs[ord(t)][1] = getReplacementJoined(t, findings)
             anyPlaceholders = true
         if not anyPlaceholders:
-              m.spawn run cmd & ' ' & getReplacementJoined(toPaths, findings)
-        else: m.spawn run cmd.replaceAt(placements, replacementPairs)
+              m.spawn execShell cmd & ' ' & getReplacementJoined(toPaths, findings)
+        else: m.spawn execShell cmd.replaceAt(placements, replacementPairs)
       else:
         let anyPlaceholders = anyIt(allIndexes, it.len > 0)
         for i in findings.low..findings.high:
@@ -156,5 +156,5 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
             if allIndexes[ord(t)].len > 0:
               replacementPairs[ord(t)][1] = getReplacement(t, findings)[i]
           if not anyPlaceholders:
-                m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
-          else: m.spawn run cmd.replaceAt(placements, replacementPairs)
+                m.spawn execShell cmd & ' ' & getReplacement(toPaths, findings)[i]
+          else: m.spawn execShell cmd.replaceAt(placements, replacementPairs)
