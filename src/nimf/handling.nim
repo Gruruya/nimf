@@ -10,15 +10,14 @@ from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 export LSColors, parseLSColorsEnv
 
-type
-  runOption* = enum
-    plainPrint, coloredPrint, collect
-
-template add(x: var string, y: varargs[string]) =
-  for j in y:
-    system.add(x, j)
-
 var lscolors*: LSColors
+
+type runOption* = enum
+  plainPrint, coloredPrint, collect
+
+template add(x: var string, j: varargs[string]) =
+  for y in j:
+    system.add(x, y)
 
 proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
