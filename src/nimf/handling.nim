@@ -133,12 +133,12 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
     for cmd in cmds.mitems:
       let allIndexes = cmd.findAll(Targets)
       let placements = allIndexes.kwayMerge
-      var replacementPairs = static:
-        (proc: array[Target.enumLen, (string, string)] =
-          for i in 0..Targets.high: result[i][0] = Targets[i])()
       if cmd.endsWith "+":
         cmd.setLen(cmd.len - 1)
         var anyPlaceholders = false
+        var replacementPairs = static:
+          (proc: array[Target.enumLen, (string, string)] =
+            for i in 0..Targets.high: result[i][0] = Targets[i])()
         for t in Target:
           if allIndexes[ord(t)].len > 0:
             replacementPairs[ord(t)][1] = getReplacementJoined(t, findings)
@@ -149,6 +149,9 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
       else:
         let anyPlaceholders = anyIt(allIndexes, it.len > 0)
         for i in findings.low..findings.high:
+          var replacementPairs = static:
+            (proc: array[Target.enumLen, (string, string)] =
+              for i in 0..Targets.high: result[i][0] = Targets[i])()
           for t in Target:
             if allIndexes[ord(t)].len > 0:
               replacementPairs[ord(t)][1] = getReplacement(t, findings)[i]
