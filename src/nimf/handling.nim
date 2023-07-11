@@ -120,7 +120,7 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
   var replacements: array[Target, seq[string]]
   var replacementsJoined: array[Target, string]
 
-  template needs(t: Target, findings: seq[Found]) =
+  template needs(t: Target) =
     if replacements[t].len == 0: replacements[t] =
       case t
       of toPaths: mapIt(findings, it.path.string.quoteShell)
@@ -132,9 +132,9 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
                                                        else: it.path.lastPathPart.string.quoteShell
                                                      else: it.path.splitFile[1].string.quoteShell)
 
-  template needsJoined(t: Target; findings: seq[Found]) =
+  template needsJoined(t: Target) =
     if replacementsJoined[t].len == 0:
-      needs(t, findings)
+      needs(t)
       replacementsJoined[t] = replacements[t].join(" ")
 
   proc execShell(cmd: string) = discard execShellCmd(cmd)
@@ -148,17 +148,17 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
         var anyPlaceholders = false
         for t in Target:
           if allIndexes[ord(t)].len > 0:
-            needsJoined(t, findings)
+            needsJoined(t)
             anyPlaceholders = true
         if not anyPlaceholders:
-              m.spawn execShell cmd & ' ' & (needsJoined(toPaths, findings); replacementsJoined[toPaths])
+              m.spawn execShell cmd & ' ' & (needsJoined(toPaths); replacementsJoined[toPaths])
         else: m.spawn execShell cmd.replaceAt(placements, replacementsJoined)
       else:
         let anyPlaceholders = anyIt(allIndexes, it.len > 0)
         for i in findings.low..findings.high:
           for t in Target:
             if allIndexes[ord(t)].len > 0:
-              needs(t, findings)
+              needs(t)
           if not anyPlaceholders:
-                m.spawn execShell cmd & ' ' & (needs(toPaths, findings); replacements[toPaths][i])
+                m.spawn execShell cmd & ' ' & (needs(toPaths); replacements[toPaths][i])
           else: m.spawn execShell cmd.replaceAt(placements, replacements, i)
