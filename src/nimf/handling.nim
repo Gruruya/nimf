@@ -6,7 +6,7 @@
 
 import ./[common, find, color], std/[os, terminal, paths, options, tables], pkg/malebolgia
 from   std/strutils import join
-from   std/sequtils import mapIt
+from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 export LSColors, parseLSColorsEnv
 
@@ -99,7 +99,7 @@ func replaceAt(text: string; placements: openArray[tuple[where, which: Natural]]
   if start <= text.high:
     result &= text[start .. text.high]
 
-proc run*(cmds: seq[string], findings: seq[Found]) =
+proc run*(cmds: sink seq[string], findings: seq[Found]) =
   ## Run the commands on the findings
   type Target = enum
     toPaths = "{}",
@@ -107,6 +107,9 @@ proc run*(cmds: seq[string], findings: seq[Found]) =
     toParentDirs = "{//}",
     toNoExtPaths = "{.}",
     toNoExtFilenames = "{/.}"
+
+  const Targets = (proc(): array[Target.enumLen, string] =
+                     for t in Target: result[ord(t)] = $t)()
 
   var replacementsStored: array[Target, seq[string]]
   var replacementsJoinedStored: array[Target, string]
@@ -128,24 +131,28 @@ proc run*(cmds: seq[string], findings: seq[Found]) =
   proc run(cmd: string) = discard execShellCmd(cmd)
   var m = createMaster()
   m.awaitAll:
-    for cmd in cmds:
-      let allIndexes = cmd.findAll(Target.mapIt($it))
+    for cmd in cmds.mitems:
+      let allIndexes = cmd.findAll(Targets)
       let placements = allIndexes.kwayMerge
+      var replacementPairs = static:
+        (proc: array[Target.enumLen, (string, string)] =
+          for i in 0..Targets.high: result[i][0] = Targets[i])()
       if cmd.endsWith "+":
-        let cmd = cmd[0..^2]
-        var replacements: array[Target, string]
+        cmd.setLen(cmd.len - 1)
+        var anyPlaceholders = false
         for t in Target:
           if allIndexes[ord(t)].len > 0:
-            replacements[t] = getReplacementJoined(t, findings)
-        if replacements == default(typeof replacements):
+            replacementPairs[ord(t)][1] = getReplacementJoined(t, findings)
+            anyPlaceholders = true
+        if not anyPlaceholders:
               m.spawn run cmd & ' ' & getReplacementJoined(toPaths, findings)
-        else: m.spawn run cmd.replaceAt(placements, Target.mapIt(($it, replacements[it])))
+        else: m.spawn run cmd.replaceAt(placements, replacementPairs)
       else:
+        let anyPlaceholders = anyIt(allIndexes, it.len > 0)
         for i in findings.low..findings.high:
-          var replacements: array[Target, string]
           for t in Target:
             if allIndexes[ord(t)].len > 0:
-              replacements[t] = getReplacement(t, findings)[i]
-          if replacements == default(typeof replacements):
+              replacementPairs[ord(t)][1] = getReplacement(t, findings)[i]
+          if not anyPlaceholders:
                 m.spawn run cmd & ' ' & getReplacement(toPaths, findings)[i]
-          else: m.spawn run cmd.replaceAt(placements, Target.mapIt(($it, replacements[it])))
+          else: m.spawn run cmd.replaceAt(placements, replacementPairs)
