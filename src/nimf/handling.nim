@@ -88,10 +88,10 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
-template replaceAtImpl(indexing = false): untyped =
+template replaceAtImpl(indexing: static bool): untyped =
   var start = text.low
   for target in placements:
-    result &= text[start ..< target.where] # Difference between the two is here ↓
+    result &= text[start ..< target.where]
     result &= (when indexing: replacements[T(target.which)][index] else: replacements[T(target.which)])
     start = target.where + len($T(target.which))
   if start <= text.high:
@@ -99,7 +99,7 @@ template replaceAtImpl(indexing = false): untyped =
 
 func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, string]): string =
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum]`
-  replaceAtImpl()
+  replaceAtImpl(indexing = false)
 
 func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: Natural]]; replacements: array[T, seq[string]]; index: Natural): string =
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum][index]`
