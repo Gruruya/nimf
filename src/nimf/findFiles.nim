@@ -170,10 +170,11 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       else: absolutePath(path)
 
     template wasFound =
-      case behavior
+      case behavior.kind
       of plainPrint: print path.string
       of coloredPrint: print ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns))
       of collect: findings.add descendent.toFound(path, matches = found)
+      of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
     if descendent.kind == pcDir:
       var path = format(descendent.path) & '/'
@@ -185,7 +186,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         let found = path.findPath(patterns)
         if found.len > 0:
           wasFound()
-        elif behavior in {plainPrint, coloredPrint}:
+        elif behavior.kind in {plainPrint, coloredPrint}:
           notFoundPrint()
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
@@ -202,7 +203,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         let found = path.findPath(patterns)
         if found.len > 0:
           wasFound()
-        elif behavior in {plainPrint, coloredPrint}:
+        elif behavior.kind in {plainPrint, coloredPrint}:
           notFoundPrint()
 
     elif descendent.kind in kinds:
@@ -210,7 +211,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       let found = path.findPath(patterns)
       if found.len > 0:
         wasFound()
-      elif behavior in {plainPrint, coloredPrint}:
+      elif behavior.kind in {plainPrint, coloredPrint}:
         notFoundPrint()
 
 proc stripDot(p: Path): Path {.inline.} =
@@ -239,13 +240,15 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
               Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
             else:
               Found(path: path.stripDot, kind: info.kind, matches: found)
-          case behavior
+          case behavior.kind
           of plainPrint: print path.string
           of coloredPrint: print color(statFound(), patterns)
           of collect: findings.add statFound()
-        elif behavior in {plainPrint, coloredPrint}:
+          of exec: run(m.getHandle, behavior.cmds, statFound())
+        elif behavior.kind in {plainPrint, coloredPrint}:
           notFoundPrint()
-  case behavior
+  case behavior.kind
   of plainPrint, coloredPrint:
     if printQueue.len > 0: stdout.write printQueue
   of collect: result &= findings.found.paths
+  else: discard

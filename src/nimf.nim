@@ -68,12 +68,16 @@ proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = fa
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(coloredPrint)
+      discard traverse(runOption(kind: coloredPrint))
       stdout.flushFile()
     else:
-      discard traverse(plainPrint)
+      discard traverse(runOption(kind: plainPrint))
   else:
-    run(execute, traverse(collect))
+    if anyIt(execute, it.endsWith("+")):
+      run(execute, traverse(runOption(kind: collect)))
+    else:
+      let cmds = execute.mapIt(Command.init(it))
+      discard traverse(runOption(kind: exec, cmds: cmds))
 
 # Special argument parsing
 proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =

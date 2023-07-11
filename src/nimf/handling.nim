@@ -12,8 +12,49 @@ export LSColors, parseLSColorsEnv
 
 var lscolors*: LSColors
 
-type runOption* = enum
-  plainPrint, coloredPrint, collect
+type
+  Target = enum
+    toPaths = "{}",
+    toFilenames = "{/}",
+    toParentDirs = "{//}",
+    toNoExtPaths = "{.}",
+    toNoExtFilenames = "{/.}"
+
+  Command* = object
+    line*: string
+    allIndexes*: seq[seq[Natural]]
+    placements*: seq[(Natural, Natural)]
+
+  runOptionKind* = enum
+    plainPrint, coloredPrint, collect, exec
+
+  runOption* = object
+    case kind*: runOptionKind
+    of exec:
+      cmds*: seq[Command]
+    else: discard
+
+const Targets = (proc(): array[Target.enumLen, string] =
+                   for t in Target: result[ord(t)] = $t)()
+
+func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
+  ## k-way merge, flattens and sorts (ascending) `seqOfSeqs`. Assumes each `seq[T]` is sorted.
+  if likely seqOfSeqs.len >= 0:
+    var indices = newSeq[int](seqOfSeqs.len)
+    while true:
+      var minIdx: Natural
+      var first = true
+      for i in 0.Natural..seqOfSeqs.high:
+        if indices[i] <= seqOfSeqs[i].high and (first or seqOfSeqs[i][indices[i]] < seqOfSeqs[minIdx][indices[minIdx]]):
+          minIdx = i
+          first = false
+      if first: break
+      result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
+      inc indices[minIdx]
+
+proc init*(T: type Command; line: string): T =
+  result = T(line: line, allIndexes: line.findAll(Targets))
+  result.placements = result.allIndexes.kwayMerge
 
 template add(x: var string, j: varargs[string]) =
   for y in j:
@@ -73,21 +114,6 @@ proc stripExtension(path: Path): Path =
   if dotPos == -1: path
   else: Path(path.string[0 ..< dotPos])
 
-func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
-  ## k-way merge, flattens and sorts (ascending) `seqOfSeqs`. Assumes each `seq[T]` is sorted.
-  if likely seqOfSeqs.len >= 0:
-    var indices = newSeq[int](seqOfSeqs.len)
-    while true:
-      var minIdx: Natural
-      var first = true
-      for i in 0.Natural..seqOfSeqs.high:
-        if indices[i] <= seqOfSeqs[i].high and (first or seqOfSeqs[i][indices[i]] < seqOfSeqs[minIdx][indices[minIdx]]):
-          minIdx = i
-          first = false
-      if first: break
-      result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
-      inc indices[minIdx]
-
 template replaceAtImpl(indexing: static bool): untyped =
   var start = text.low
   for target in placements:
@@ -105,21 +131,10 @@ func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: 
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum][index]`
   replaceAtImpl(indexing = true)
 
+proc execShell(cmd: string) = discard execShellCmd(cmd)
+
 proc run*(cmds: sink seq[string], findings: seq[Found]) =
   ## Run the commands on the findings
-  type Target = enum
-    toPaths = "{}",
-    toFilenames = "{/}",
-    toParentDirs = "{//}",
-    toNoExtPaths = "{.}",
-    toNoExtFilenames = "{/.}"
-
-  const Targets = (proc(): array[Target.enumLen, string] =
-                     for t in Target: result[ord(t)] = $t)()
-
-  var replacements: array[Target, seq[string]]
-  var replacementsJoined: array[Target, string]
-
   template needs(t: Target) =
     if replacements[t].len == 0: replacements[t] =
       case t
@@ -137,7 +152,9 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
       needs(t)
       replacementsJoined[t] = replacements[t].join(" ")
 
-  proc execShell(cmd: string) = discard execShellCmd(cmd)
+  var replacements: array[Target, seq[string]]
+  var replacementsJoined: array[Target, string]
+
   var m = createMaster()
   m.awaitAll:
     for cmd in cmds.mitems:
@@ -162,3 +179,26 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
           if not anyPlaceholders:
                 m.spawn execShell cmd & ' ' & (needs(toPaths); replacements[toPaths][i])
           else: m.spawn execShell cmd.replaceAt(placements, replacements, i)
+
+proc run*(m: MasterHandle; cmds: seq[Command], found: Found) =
+  ## Run the commands on the findings
+  template needs(t: Target) =
+    replacements[t] =
+      case t
+      of toPaths: found.path.string.quoteShell
+      of toFilenames: found.path.lastPathPart.string.quoteShell
+      of toParentDirs: found.path.parentDir.string.quoteShell
+      of toNoExtPaths: found.path.stripExtension.string.quoteShell
+      of toNoExtFilenames: (if found.kind == pcDir: found.path.lastPathPart.string.quoteShell
+                            else: found.path.splitFile[1].string.quoteShell)
+
+  var replacements: array[Target, string]
+  for cmd in cmds.items:
+    var anyPlaceholders = false
+    for t in Target:
+      if cmd.allIndexes[ord(t)].len > 0:
+        needs(t)
+        anyPlaceholders = true
+    if not anyPlaceholders:
+          m.spawn execShell cmd.line & ' ' & (needs(toPaths); replacements[toPaths])
+    else: m.spawn execShell cmd.line.replaceAt(cmd.placements, replacements)
