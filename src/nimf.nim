@@ -216,23 +216,24 @@ proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
   @[a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
 
 proc f*() =
-  dispatch(cliFind, cmdName = "f",
-                    usage = (try: getAppFilename().lastPathPart except: "f") & " $args\n\n" &
-                            "Entered `input` may be a pattern OR a path to search.\n" &
-                            "The pattern will only match with the filename unless you include a `/`.\n" &
-                            "\nOptions:\n$options",
-                    short = {"followSymlinks": 'L'},
-                    help = {"execute": "Execute a command for each matching search result in parallel.\n" &
-                                    "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
-                                    "Example: f .nim -e \"$EDITOR\"+\n" &
-                                    "The following placeholders are substituted before the command is executed:\n" &
-                                    "\"{}\":   path (of the current search result)\n" &
-                                    "\"{/}\":  basename\n" &
-                                    "\"{//}\": parent directory\n" &
-                                    "\"{.}\":  path without file extension\n" &
-                                    "\"{/.}\": basename without file extension\n" &
-                                    "Example: f .jpg -e 'convert {} {.}.png'\n" &
-                                    "If no placeholder is present, an implicit \"{}\" at the end is assumed."})
+  dispatch(cliFind,
+           cmdName = "f",
+           usage = (try: getAppFilename().lastPathPart except: "f") & " $args\n\n" &
+                    "Entered `input` may be a pattern OR a path to search.\n" &
+                    "The pattern will only match with the filename unless you include a `/`.\n" &
+                    "\nOptions:\n$options",
+           short = {"followSymlinks": 'L'},
+           help = {"execute": "Execute a command for each matching search result in parallel.\n" &
+                              "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
+                              "Example: f .nim -e \"$EDITOR\"+\n" &
+                              "The following placeholders are substituted before the command is executed:\n" &
+                              "\"{}\":   path (of the current search result)\n" &
+                              "\"{/}\":  basename\n" &
+                              "\"{//}\": parent directory\n" &
+                              "\"{.}\":  path without file extension\n" &
+                              "\"{/.}\": basename without file extension\n" &
+                              "Example: f .jpg -e 'convert {} {.}.png'\n" &
+                              "If no placeholder is present, an implicit \"{}\" at the end is assumed."})
 
 when isMainModule:
   f()
