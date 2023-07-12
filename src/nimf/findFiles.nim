@@ -105,18 +105,19 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
         if not relative:
           result.path = path
 
-        proc getSymlinkFileKind(path: Path): tuple[pc: PathComponent, broken: bool] =
+        template getSymlinkFileKind(path: Path) =
           var s: Stat
           assert(path != Path "")
-          result = (pcLinkToFile, true)
           if stat(path.cstring, s) == 0'i32:
             if S_ISDIR(s.st_mode):
-              result = (pcLinkToDir, false)
+              result.kind = pcLinkToDir
             elif S_ISREG(s.st_mode):
-              result = (pcLinkToFile, false)
+              (result.kind, result.broken) = (pcLinkToFile, false)
+            else: (result.kind, result.broken) = (pcLinkToFile, true)
+          else: (result.kind, result.broken) = (pcLinkToFile, true)
 
         template resolveSymlink() =
-          (result.kind, result.broken) = getSymlinkFileKind(path)
+          getSymlinkFileKind(path)
 
         template kSetGeneric() = # pure Posix component `k` resolution
           if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
