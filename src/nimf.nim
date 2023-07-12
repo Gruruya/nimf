@@ -127,7 +127,8 @@ proc f*() =
                               "\"{.}\":  path without file extension\n" &
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
-                              "If no placeholder is present, an implicit \" {}\" at the end is assumed."})
+                              "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
+                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`."})
 
 when isMainModule:
   f()
