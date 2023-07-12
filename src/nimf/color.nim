@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 ## Color support for the CLI, parsed from `LS_COLORS`
-#TODO: Replace lscolors package
 import pkg/lscolors/[stdlibterm, style, entrytypes],
        ./[common, find],
        std/[options, posix, os, tables], adix/lptabz

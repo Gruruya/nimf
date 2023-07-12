@@ -34,9 +34,9 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
   ## Overwrites `x[i]` with `y`
   if i == x.high:
     if i == x.low: x = y
-    else: x.setLen x.len - 1; x.add y
+    else: x.setLen(x.len - 1); x.add y
   else:
-    x.setLen x.len + y.len - 1
+    x.setLen(x.len + y.len - 1)
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 

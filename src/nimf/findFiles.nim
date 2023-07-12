@@ -65,7 +65,9 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
     if '/' in patterns[i]:
       filenameSep = i
       break
-  let lastSep = path.string.rfind("/", last = path.string.high - 1).get(0)
+  let lastSep = block:
+    if path.string.len == 1: 0
+    else: path.string.rfind("/", last = path.string.high - 1).get(0)
 
   result = newSeq[(int, int)](patterns.len)
   var last = path.string.high
@@ -123,18 +125,19 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
           elif S_ISLNK(result.stat.st_mode):
             resolveSymlink()
 
-        when defined(linux) or defined(macosx) or
-             defined(bsd) or defined(genode) or defined(nintendoswitch):
-          case x.d_type
-          of DT_DIR: result.kind = pcDir
-          of DT_LNK:
-            resolveSymlink()
-          of DT_UNKNOWN:
+        {.cast(uncheckedAssign).}: # Assigning `result.kind`
+          when defined(linux) or defined(macosx) or
+               defined(bsd) or defined(genode) or defined(nintendoswitch):
+            case x.d_type
+            of DT_DIR: result.kind = pcDir
+            of DT_LNK:
+              resolveSymlink()
+            of DT_UNKNOWN:
+              kSetGeneric()
+            else: # DT_REG or special "files" like FIFOs
+              discard
+          else:  # assuming that field `d_type` is not present
             kSetGeneric()
-          else: # DT_REG or special "files" like FIFOs
-            discard
-        else:  # assuming that field `d_type` is not present
-          kSetGeneric()
 
         yield result
 
