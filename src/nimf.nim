@@ -37,7 +37,8 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = false; null = false; input: seq[string]): int =
+proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = false; null = false;
+  hyperlink = false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -84,13 +85,14 @@ proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = 
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
     let displayColor = color.isBlank and envColorEnabled or
                        color.isFilled and (if color.input.len == 0: not envColorEnabled else: color.val)
+    let hyperlink = stdout.isatty and hyperlink
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(runOption(kind: coloredPrint, null: null))
+      discard traverse(runOption(kind: coloredPrint, null: null, hyperlink: hyperlink))
       stdout.flushFile()
     else:
-      discard traverse(runOption(kind: plainPrint, null: null))
+      discard traverse(runOption(kind: plainPrint, null: null, hyperlink: hyperlink))
   else:
     if anyIt(execute, it.endsWith("+")):
       run(execute, traverse(runOption(kind: collect)))
@@ -125,7 +127,8 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
-                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`."})
+                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
+                    "hyperlink": "Enable clickable hyperlinks in supported terminals."})
 
 when isMainModule:
   f()

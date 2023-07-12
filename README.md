@@ -33,6 +33,7 @@ Options:
                                         If no placeholder is present, an implicit " {}" at the end is assumed.
   -L, --followSymlinks  bool     false  set followSymlinks
   -0, --null            bool     false  Separate search results and split stdin with null characters `\0` instead of newlines `\n`.
+  --hyperlink           bool     false  Enable clickable hyperlinks in supported terminals.
 ```
 
 ---

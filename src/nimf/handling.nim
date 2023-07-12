@@ -32,6 +32,7 @@ type
     case kind*: runOptionKind
     of plainPrint, coloredPrint:
       null*: bool
+      hyperlink*: bool
     of exec:
       cmds*: seq[Command]
     else: discard
