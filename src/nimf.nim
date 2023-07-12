@@ -30,9 +30,31 @@ proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
   assert self.isSome
   result = self.val
 
+func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
+  ## Overwrites `x[i]` with `y`
+  if i == x.high:
+    if i == x.low: x = y
+    else: x.setLen x.len - 1; x.add y
+  else:
+    x.setLen x.len + y.len - 1
+    x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
+    x[i ..< i + y.len] = y
+
 proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = false, input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
+  var input = input
+  if not stdin.isatty: # Add stdin to `input`
+    if input.len == 0:
+      input = stdin.readAll().split('\n')
+      if input[^1].len == 0: input.setLen(input.len - 1)
+    else:
+      var si = stdin.readAll().split('\n')
+      if si[^1].len == 0: si.setLen(si.len - 1)
+      var i = input.low
+      while i <= input.high:
+        if input[i] in ["-", "/dev/stdin"]: input.substitute(si, i); inc(i, si.len)
+        else: inc i
 
   proc isChildOf(path, potParent: string): bool =
     let aPotParent = absolutePath(Path(potParent))
