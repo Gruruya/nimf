@@ -16,19 +16,16 @@ type Flag[T] = object
   val*: T
   has*: bool
   input*: string
-proc some[T](val: sink T): Flag[T] {.inline.} =
+proc filled[T](val: sink T): Flag[T] {.inline.} =
   result.has = true
   result.val = val
-proc none[T](val: sink T): Flag[T] {.inline.} =
+proc blank[T](val: sink T): Flag[T] {.inline.} =
   result.has = false
   result.val = val
-proc none(T: typedesc): Flag[T] {.inline.} = Flag[T]()
-proc none[T]: Flag[T] {.inline.} = none(T)
-proc isSome[T](self: Flag[T]): bool {.inline.} = self.has
-proc isNone[T](self: Flag[T]): bool {.inline.} = not self.has
-proc unsafeGet[T](self: Flag[T]): lent T {.inline.} =
-  assert self.isSome
-  result = self.val
+proc blank(T: typedesc): Flag[T] {.inline.} = Flag[T]()
+proc blank[T]: Flag[T] {.inline.} = blank(T)
+proc isFilled[T](self: Flag[T]): bool {.inline.} = self.has
+proc isBlank[T](self: Flag[T]): bool {.inline.} = not self.has
 
 func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
   ## Overwrites `x[i]` with `y`
@@ -40,7 +37,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = none bool; execute = newSeq[string](); followSymlinks = false; null = false; input: seq[string]): int =
+proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = false; null = false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -85,8 +82,8 @@ proc cliFind*(color = none bool; execute = newSeq[string](); followSymlinks = fa
 
   if execute.len == 0:
     let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
-    let displayColor = color.isNone and envColorEnabled or
-                       color.isSome and (if color.input.len == 0: not envColorEnabled else: color.unsafeGet)
+    let displayColor = color.isBlank and envColorEnabled or
+                       color.isFilled and (if color.input.len == 0: not envColorEnabled else: color.val)
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
@@ -104,10 +101,10 @@ proc cliFind*(color = none bool; execute = newSeq[string](); followSymlinks = fa
 # Special argument parsing
 proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
   var uw: T # An unwrapped value
-  result = argParse(uw, (if dfl.isSome: dfl.unsafeGet else: uw), a)
-  if result: dst = some uw; dst.input = a.val
+  result = argParse(uw, (if dfl.isFilled: dfl.val else: uw), a)
+  if result: dst = filled uw; dst.input = a.val
 proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
-  @[a.argKeys, $T, (if dfl.isSome: $dfl.unsafeGet else: "?")]
+  @[a.argKeys, $T, (if dfl.isFilled: $dfl.val else: "?")]
 
 proc f*() =
   dispatch(cliFind,
