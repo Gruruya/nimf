@@ -4,7 +4,7 @@
 
 ## File path finding, posix only currently as it uses stat.
 
-import ./[common, find, handling], std/[os, paths, locks, atomics, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
+import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -139,13 +139,13 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
         yield result
 
 var printQueue = newStringOfCap(8192)
-var numFailed: Atomic[int] # To print often even if there's a lot of filtering but few matches
+var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var printLock: Lock
 
 proc writePrintQueue() {.inline.} =
   stdout.write printQueue
   printQueue.setLen 0
-  numFailed.store(0)
+  numFailed = 0
 
 proc print(s: string, null: bool) {.inline.} =
   withLock(printLock):
@@ -154,9 +154,12 @@ proc print(s: string, null: bool) {.inline.} =
       writePrintQueue()
 
 proc notFoundPrint() {.inline.} =
-  if ({.gcsafe.}: printQueue.len) > 0 and numFailed.fetchAdd(1) > 16384:
-    withLock(printLock):
-      writePrintQueue()
+  {.gcsafe.}:
+    if printQueue.len > 0:
+      inc numFailed
+      if numFailed > 16384:
+        withLock(printLock):
+          writePrintQueue()
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption) {.gcsafe.} =
   let absolute = isAbsolute(dir)
