@@ -139,8 +139,9 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
         yield result
 
 var printQueue = newStringOfCap(8192)
-var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var printLock: Lock
+var numFailed = 0 # To print often even if there's a lot of filtering but few matches
+var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 
 proc writePrintQueue() {.inline.} =
   stdout.write printQueue
@@ -148,10 +149,14 @@ proc writePrintQueue() {.inline.} =
   numFailed = 0
 
 proc print(s: string, null: bool) {.inline.} =
-  withLock(printLock):
-    printQueue.add s & (if null: '\0' else: '\n')
-    if printQueue.len >= 8192:
-      writePrintQueue()
+  if numPrinted < 16384:
+    stdout.write s & (if null: '\0' else: '\n')
+    inc numPrinted
+  else:
+    withLock(printLock):
+      printQueue.add s & (if null: '\0' else: '\n')
+      if printQueue.len >= 8192:
+        writePrintQueue()
 
 proc notFoundPrint() {.inline.} =
   {.gcsafe.}:
