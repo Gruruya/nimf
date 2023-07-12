@@ -30,8 +30,9 @@ Options:
                                         "{.}":  path without file extension
                                         "{/.}": basename without file extension
                                         Example: f .jpg -e 'convert {} {.}.png'
-                                        If no placeholder is present, an implicit "{}" at the end is assumed.
+                                        If no placeholder is present, an implicit " {}" at the end is assumed.
   -L, --followSymlinks  bool     false  set followSymlinks
+  -0, --null            bool     false  Separate search results and split stdin with null characters `\0` instead of newlines `\n`.
 ```
 
 ---
