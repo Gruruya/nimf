@@ -147,9 +147,9 @@ proc writePrintQueue() {.inline.} =
   printQueue.setLen 0
   numFailed.store(0)
 
-proc print(s: string) {.inline.} =
+proc print(s: string, null: bool) {.inline.} =
   withLock(printLock):
-    printQueue.add s & '\n'
+    printQueue.add s & (if null: '\0' else: '\n')
     if printQueue.len >= 8192:
       writePrintQueue()
 
@@ -171,8 +171,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
 
     template wasFound =
       case behavior.kind
-      of plainPrint: print path.string
-      of coloredPrint: print ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns))
+      of plainPrint: print(path.string, behavior.null)
+      of coloredPrint: print(({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)), behavior.null)
       of collect: findings.add descendent.toFound(path, matches = found)
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
@@ -241,8 +241,8 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
             else:
               Found(path: path.stripDot, kind: info.kind, matches: found)
           case behavior.kind
-          of plainPrint: print path.string
-          of coloredPrint: print color(statFound(), patterns)
+          of plainPrint: print(path.string, behavior.null)
+          of coloredPrint: print(color(statFound(), patterns), behavior.null)
           of collect: findings.add statFound()
           of exec: run(m.getHandle, behavior.cmds, statFound())
         elif behavior.kind in {plainPrint, coloredPrint}:

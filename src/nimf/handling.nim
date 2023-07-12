@@ -30,6 +30,8 @@ type
 
   runOption* = object
     case kind*: runOptionKind
+    of plainPrint, coloredPrint:
+      null*: bool
     of exec:
       cmds*: seq[Command]
     else: discard

@@ -40,16 +40,16 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = false, input: seq[string]): int =
+proc cliFind*(color = none bool; execute = newSeq[string](); followSymlinks = false; null = false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
   if not stdin.isatty: # Add stdin to `input`
     if input.len == 0:
-      input = stdin.readAll().split('\n')
+      input = stdin.readAll().split(if null: '\0' else: '\n')
       if input[^1].len == 0: input.setLen(input.len - 1)
     else:
-      var si = stdin.readAll().split('\n')
+      var si = stdin.readAll().split(if null: '\0' else: '\n')
       if si[^1].len == 0: si.setLen(si.len - 1)
       var i = input.low
       while i <= input.high:
@@ -90,10 +90,10 @@ proc cliFind*(color = none bool, execute = newSeq[string](), followSymlinks = fa
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(runOption(kind: coloredPrint))
+      discard traverse(runOption(kind: coloredPrint, null: null))
       stdout.flushFile()
     else:
-      discard traverse(runOption(kind: plainPrint))
+      discard traverse(runOption(kind: plainPrint, null: null))
   else:
     if anyIt(execute, it.endsWith("+")):
       run(execute, traverse(runOption(kind: collect)))
@@ -116,7 +116,7 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"followSymlinks": 'L'},
+           short = {"followSymlinks": 'L', "null": '0'},
            help = {"execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
