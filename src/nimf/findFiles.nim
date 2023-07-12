@@ -149,7 +149,7 @@ proc writePrintQueue() {.inline.} =
   numFailed = 0
 
 proc print(s: string, null: bool) {.inline.} =
-  if numPrinted < 16384:
+  if numPrinted < 8192:
     stdout.write s & (if null: '\0' else: '\n')
     inc numPrinted
   else:
