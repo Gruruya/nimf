@@ -12,6 +12,9 @@ from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 
 type Flag {.pure.} = enum
+  ## `bool` but with `auto` and `inverse`
+  ## `true` and `false` mean explicitly always enable and disable
+  ## while `auto` and `inverse` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
   true, false, auto, inverse
 
 func `not`(flag: Flag): Flag =
