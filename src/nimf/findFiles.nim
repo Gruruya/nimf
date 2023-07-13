@@ -178,16 +178,6 @@ proc print(path: Path; behavior: runOption; display = path.string) =
       if printQueue.len >= 8192:
         writePrintQueue()
 
-proc print(s: string, null: bool) =
-  if numPrinted < 8192:
-    stdout.write s & (if null: '\0' else: '\n')
-    inc numPrinted
-  else:
-    withLock(printLock):
-      printQueue.add s & (if null: '\0' else: '\n')
-      if printQueue.len >= 8192:
-        writePrintQueue()
-
 proc notFoundPrint() =
   {.gcsafe.}:
     if printQueue.len > 0:
