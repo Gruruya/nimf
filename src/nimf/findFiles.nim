@@ -208,7 +208,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       of collect: findings.add descendent.toFound(path, matches = found)
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
-    template search(path: Path) =
+    template match(path: Path) =
       let found = path.findPath(patterns)
       if found.len > 0:
         wasFound(found)
@@ -222,7 +222,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         if findings.seenOrIncl absPath: continue
       m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior)
       if pcDir in kinds:
-        search(path)
+        match(path)
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       let path = format(descendent.path)
@@ -235,11 +235,11 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior)
 
       if pcLinkToDir in kinds:
-        search(path)
+        match(path)
 
     elif descendent.kind in kinds:
       let path = format(descendent.path)
-      search(path)
+      match(path)
 
 func stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
