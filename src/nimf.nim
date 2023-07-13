@@ -12,20 +12,20 @@ from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 
 # `options.Option` but also stores the input so we can negate flags without values like `-c`
-type Flag[T] = object
+type Param[T] = object
   val*: T
-  has*: bool
+  set*: bool
   input*: string
-proc filled[T](val: sink T): Flag[T] {.inline.} =
-  result.has = true
+proc filled[T](val: sink T): Param[T] {.inline.} =
+  result.set = true
   result.val = val
-proc blank[T](val: sink T): Flag[T] {.inline.} =
-  result.has = false
+proc blank[T](val: sink T): Param[T] {.inline.} =
+  result.set = false
   result.val = val
-proc blank(T: typedesc): Flag[T] {.inline.} = Flag[T]()
-proc blank[T]: Flag[T] {.inline.} = blank(T)
-proc isFilled[T](self: Flag[T]): bool {.inline.} = self.has
-proc isBlank[T](self: Flag[T]): bool {.inline.} = not self.has
+proc blank(T: typedesc): Param[T] {.inline.} = Param[T]()
+proc blank[T]: Param[T] {.inline.} = blank(T)
+proc isSet[T](self: Param[T]): bool {.inline.} = self.set
+proc isUnset[T](self: Param[T]): bool {.inline.} = not self.set
 
 func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
   ## Overwrites `x[i]` with `y`
@@ -82,10 +82,11 @@ proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = 
     traverseFind(paths, patterns, {pcFile, pcDir, pcLinkToFile, pcLinkToDir}, followSymlinks, andDo)
 
   if execute.len == 0:
-    let envColorEnabled = stdout.isatty and getEnv("NO_COLOR").len == 0
-    let displayColor = color.isBlank and envColorEnabled or
-                       color.isFilled and (if color.input.len == 0: not envColorEnabled else: color.val)
-    let hyperlink = stdout.isatty and hyperlink
+    let isatty = stdout.isatty
+    let envColorEnabled = isatty and getEnv("NO_COLOR").len == 0
+    let displayColor = color.isUnset and envColorEnabled or
+                       color.isSet and (if color.input.len == 0: (if not isatty: false else: not envColorEnabled) else: color.val)
+    let hyperlink = isatty and hyperlink
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
@@ -101,12 +102,12 @@ proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = 
       discard traverse(runOption(kind: exec, cmds: cmds))
 
 # Special argument parsing
-proc argParse[T](dst: var Flag[T], dfl: Flag[T], a: var ArgcvtParams): bool =
+proc argParse[T](dst: var Param[T], dfl: Param[T], a: var ArgcvtParams): bool =
   var uw: T # An unwrapped value
-  result = argParse(uw, (if dfl.isFilled: dfl.val else: uw), a)
+  result = argParse(uw, (if dfl.isSet: dfl.val else: uw), a)
   if result: dst = filled uw; dst.input = a.val
-proc argHelp[T](dfl: Flag[T]; a: var ArgcvtParams): seq[string] =
-  @[a.argKeys, $T, (if dfl.isFilled: $dfl.val else: "?")]
+proc argHelp[T](dfl: Param[T]; a: var ArgcvtParams): seq[string] =
+  @[a.argKeys, $T, (if dfl.isSet: $dfl.val else: "?")]
 
 proc f*() =
   dispatch(cliFind,
