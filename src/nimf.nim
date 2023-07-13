@@ -14,15 +14,8 @@ from   std/typetraits import enumLen
 type Flag {.pure.} = enum
   ## `bool` but with `auto` and `inverse`
   ## `true` and `false` mean explicitly always enable and disable
-  ## while `auto` and `inverse` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
+  ##  while `auto` and `inverse` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
   true, false, auto, inverse
-
-func `not`(flag: Flag): Flag =
-  case flag
-  of Flag.true: Flag.false
-  of Flag.false: Flag.true
-  of Flag.auto: Flag.inverse
-  of Flag.inverse: Flag.auto
 
 func toBool(flag: Flag; auto = true, inverse = false, true = true, false = false): bool =
   case flag
@@ -85,9 +78,9 @@ proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = fa
     traverseFind(paths, patterns, {pcFile, pcDir, pcLinkToFile, pcLinkToDir}, followSymlinks, andDo)
 
   if execute.len == 0:
-    let isatty = stdout.isatty # We only write to stdout for explicit `yes` options
-    let displayColor = color.toBool(auto = isatty and getEnv("NO_COLOR").len == 0, inverse = isatty and getEnv("NO_COLOR").len != 0)
-    let hyperlink = hyperlink.toBool(auto = isatty)
+    let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
+    let displayColor = color.toBool(auto = toatty and getEnv("NO_COLOR").len == 0, inverse = toatty and getEnv("NO_COLOR").len != 0)
+    let hyperlink = hyperlink.toBool(auto = toatty)
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
