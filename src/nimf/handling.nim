@@ -8,6 +8,7 @@ import ./[common, find, color], std/[os, terminal, paths, options, tables], pkg/
 from   std/strutils import join
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
+from   std/nativesockets import getHostname
 export LSColors, parseLSColorsEnv
 
 var lscolors*: LSColors
@@ -32,10 +33,23 @@ type
     case kind*: runOptionKind
     of plainPrint, coloredPrint:
       null*: bool
-      hyperlink*: bool
+      case hyperlink*: bool
+      of true:
+        hyperlinkPrefix*: string
+        cwd*: string
+      else: discard
     of exec:
       cmds*: seq[Command]
     else: discard
+
+proc init*(T: type runOption; kind: runOptionKind; null: bool; hyperlink: bool): T =
+  assert kind in {plainPrint, coloredPrint}
+  {.cast(uncheckedAssign).}:
+    if hyperlink:
+      runOption(kind: kind, null: null, hyperlink: true,
+                hyperlinkPrefix: "\e]8;;file://" & encodeHyperlink(getHostname()),
+                cwd: encodeHyperlink(os.getCurrentDir()) & '/')
+    else: runOption(kind: kind, null: null, hyperlink: false)
 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()

@@ -89,10 +89,10 @@ proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = 
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(runOption(kind: coloredPrint, null: null, hyperlink: hyperlink))
+      discard traverse(runOption.init(coloredPrint, null, hyperlink))
       stdout.flushFile()
     else:
-      discard traverse(runOption(kind: plainPrint, null: null, hyperlink: hyperlink))
+      discard traverse(runOption.init(plainPrint, null, hyperlink))
   else:
     if anyIt(execute, it.endsWith("+")):
       run(execute, traverse(runOption(kind: collect)))

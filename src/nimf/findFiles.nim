@@ -5,7 +5,6 @@
 ## File path finding, posix only currently as it uses stat.
 
 import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
-from std/nativesockets import getHostname
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -174,22 +173,6 @@ proc notFoundPrint() =
         withLock(printLock):
           writePrintQueue()
 
-func toHex(x: char): array[2, char] =
-  const HexChars = "0123456789ABCDEF"
-  [HexChars[(ord(x) shr 4 and 0xf)], HexChars[(ord(x) and 0xF)]]
-
-template add(x: var string, y: varargs[char]) =
-  for j in y: system.add(x, j)
-
-func encodeHyperlink(s: string): string =
-  result = newStringOfCap(s.len)
-  for c in s:
-    if c in {'\32'..'\126'}:
-      result.add c
-    else:
-      result.add '%'
-      result.add toHex(c)
-
 func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
   result = prefix
   if not path.isAbsolute:
@@ -201,7 +184,7 @@ func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): stri
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption, hyperlinkPrefix, cwd: string) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDirStat(relative = not absolute):
     template format(path: Path): Path =
@@ -216,13 +199,13 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       case behavior.kind
       of plainPrint:
         if behavior.hyperlink:
-          print(wrapHyperlink(path, hyperlinkPrefix, cwd), behavior.null)
+          print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd), behavior.null)
         else:
           print(path.string, behavior.null)
       of coloredPrint:
         let display = ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns))
         if behavior.hyperlink:
-          print(wrapHyperlink(path, hyperlinkPrefix, cwd, display), behavior.null)
+          print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, display), behavior.null)
         else:
           print(display, behavior.null)
       of collect: findings.add descendent.toFound(path, matches = found)
@@ -233,7 +216,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if followSymlinks:
         let absPath = path.absolute
         if findings.seenOrIncl absPath: continue
-      m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior, hyperlinkPrefix, cwd)
+      m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior)
       if pcDir in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
@@ -249,7 +232,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
       if not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior, hyperlinkPrefix, cwd)
+        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior)
 
       if pcLinkToDir in kinds:
         let found = path.findPath(patterns)
@@ -272,14 +255,11 @@ func stripDot(p: Path): Path {.inline.} =
 
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: runOption): seq[Found] =
   var m = createMaster()
-  let hyperlinked = behavior.kind in {plainPrint, coloredPrint} and behavior.hyperlink
-  let hyperlinkPrefix = if hyperlinked: "\e]8;;file://" & encodeHyperlink(getHostname()) else: ""
-  let cwd = if hyperlinked: encodeHyperlink(os.getCurrentDir()) & '/' else: ""
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior, hyperlinkPrefix, cwd)
+        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior)
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
@@ -298,12 +278,12 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
           case behavior.kind
           of plainPrint:
             if behavior.hyperlink:
-              print(wrapHyperlink(path, hyperlinkPrefix, cwd), behavior.null)
+              print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd), behavior.null)
             else:
               print(path.string, behavior.null)
           of coloredPrint:
             if behavior.hyperlink:
-              print(wrapHyperlink(path, hyperlinkPrefix, cwd, color(statFound(), patterns)), behavior.null)
+              print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, color(statFound(), patterns)), behavior.null)
             else:
               print(color(statFound(), patterns), behavior.null)
           of collect: findings.add statFound()
