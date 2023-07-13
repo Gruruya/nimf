@@ -6,7 +6,6 @@
 
 import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 from std/nativesockets import getHostname
-from std/strutils import toHex
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -150,12 +149,14 @@ var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 
-proc writePrintQueue() {.inline.} =
+{.push inline.}
+
+proc writePrintQueue() =
   stdout.write printQueue
   printQueue.setLen 0
   numFailed = 0
 
-proc print(s: string, null: bool) {.inline.} =
+proc print(s: string, null: bool) =
   if numPrinted < 8192:
     stdout.write s & (if null: '\0' else: '\n')
     inc numPrinted
@@ -165,7 +166,7 @@ proc print(s: string, null: bool) {.inline.} =
       if printQueue.len >= 8192:
         writePrintQueue()
 
-proc notFoundPrint() {.inline.} =
+proc notFoundPrint() =
   {.gcsafe.}:
     if printQueue.len > 0:
       inc numFailed
@@ -173,24 +174,32 @@ proc notFoundPrint() {.inline.} =
         withLock(printLock):
           writePrintQueue()
 
-proc encodeHyperlink(s: string): string =
+func toHex(x: char): array[2, char] =
+  const HexChars = "0123456789ABCDEF"
+  [HexChars[(ord(x) shr 4 and 0xf)], HexChars[(ord(x) and 0xF)]]
+
+template add(x: var string, y: varargs[char]) =
+  for j in y: system.add(x, j)
+
+func encodeHyperlink(s: string): string =
   result = newStringOfCap(s.len)
   for c in s:
-    if c.ord in 32..126:
+    if c in {'\32'..'\126'}:
       result.add c
     else:
       result.add '%'
-      result.add toHex(ord(c), 2)
+      result.add toHex(c)
 
-proc wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string {.inline.} =
+func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
   result = prefix
   if not path.isAbsolute:
     result.add cwd
   result.add encodeHyperlink(path.string)
-  result.add '\e'
-  result.add '\\'
+  result.add "\e\\"
   result.add display
   result.add "\e]8;;\e\\"
+
+{.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption, hyperlinkPrefix, cwd: string) {.gcsafe.} =
   let absolute = isAbsolute(dir)
@@ -211,8 +220,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         else:
           print(path.string, behavior.null)
       of coloredPrint:
-        let display = ({.gcsafe.}:
-          color(descendent.toFound(path, matches = found), patterns))
+        let display = ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns))
         if behavior.hyperlink:
           print(wrapHyperlink(path, hyperlinkPrefix, cwd, display), behavior.null)
         else:
@@ -266,7 +274,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
   var m = createMaster()
   let hyperlinked = behavior.kind in {plainPrint, coloredPrint} and behavior.hyperlink
   let hyperlinkPrefix = if hyperlinked: "\e]8;;file://" & encodeHyperlink(getHostname()) else: ""
-  let cwd = if hyperlinked: encodeHyperlink(os.getCurrentDir()) & "/" else: ""
+  let cwd = if hyperlinked: encodeHyperlink(os.getCurrentDir()) & '/' else: ""
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
