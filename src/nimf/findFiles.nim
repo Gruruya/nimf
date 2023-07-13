@@ -91,6 +91,7 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
       last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
+  # `walkDir` which yields an object containing the `Stat` if the path was a file
   var d = opendir(dir)
   if d == nil:
     if checkDir:
@@ -257,7 +258,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       elif behavior.kind in {plainPrint, coloredPrint}:
         notFoundPrint()
 
-proc stripDot(p: Path): Path {.inline.} =
+func stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 

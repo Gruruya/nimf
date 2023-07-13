@@ -60,8 +60,7 @@ proc init*(T: type Command; line: string): T =
   result.placements = result.allIndexes.kwayMerge
 
 template add(x: var string, j: varargs[string]) =
-  for y in j:
-    system.add(x, y)
+  for y in j: system.add(x, y)
 
 proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
