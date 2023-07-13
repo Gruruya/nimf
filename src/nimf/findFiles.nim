@@ -199,7 +199,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if absolute: path
       else: absolutePath(path)
 
-    template wasFound =
+    template wasFound(found: seq[(int, int)]) =
       case behavior.kind
       of plainPrint:
         print(path, behavior)
@@ -208,18 +208,21 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       of collect: findings.add descendent.toFound(path, matches = found)
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
+    template search(path: Path) =
+      let found = path.findPath(patterns)
+      if found.len > 0:
+        wasFound(found)
+      elif behavior.kind in {plainPrint, coloredPrint}:
+        notFoundPrint()
+
     if descendent.kind == pcDir:
-      var path = format(descendent.path) & '/'
+      let path = format(descendent.path) & '/'
       if followSymlinks:
         let absPath = path.absolute
         if findings.seenOrIncl absPath: continue
       m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior)
       if pcDir in kinds:
-        let found = path.findPath(patterns)
-        if found.len > 0:
-          wasFound()
-        elif behavior.kind in {plainPrint, coloredPrint}:
-          notFoundPrint()
+        search(path)
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       let path = format(descendent.path)
@@ -232,19 +235,11 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior)
 
       if pcLinkToDir in kinds:
-        let found = path.findPath(patterns)
-        if found.len > 0:
-          wasFound()
-        elif behavior.kind in {plainPrint, coloredPrint}:
-          notFoundPrint()
+        search(path)
 
     elif descendent.kind in kinds:
       let path = format(descendent.path)
-      let found = path.findPath(patterns)
-      if found.len > 0:
-        wasFound()
-      elif behavior.kind in {plainPrint, coloredPrint}:
-        notFoundPrint()
+      search(path)
 
 func stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
@@ -257,6 +252,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
         m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior)
+
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
@@ -272,6 +268,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
               Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
             else:
               Found(path: path.stripDot, kind: info.kind, matches: found)
+
           case behavior.kind
           of plainPrint:
             print(path, behavior)
@@ -281,6 +278,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
           of exec: run(m.getHandle, behavior.cmds, statFound())
         elif behavior.kind in {plainPrint, coloredPrint}:
           notFoundPrint()
+
   case behavior.kind
   of plainPrint, coloredPrint:
     if printQueue.len > 0: stdout.write printQueue
