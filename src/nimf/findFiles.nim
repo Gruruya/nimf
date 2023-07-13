@@ -155,6 +155,29 @@ proc writePrintQueue() =
   printQueue.setLen 0
   numFailed = 0
 
+func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
+  result = prefix
+  if not path.isAbsolute:
+    result.add cwd
+  result.add encodeHyperlink(path.string)
+  result.add "\e\\"
+  result.add display
+  result.add "\e]8;;\e\\"
+
+proc print(path: Path; behavior: runOption; display = path.string) =
+  template output: string =
+    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, display)
+     else: display) & (if behavior.null: '\0' else: '\n')
+
+  if numPrinted < 8192:
+    stdout.write output()
+    inc numPrinted
+  else:
+    withLock(printLock):
+      printQueue.add output()
+      if printQueue.len >= 8192:
+        writePrintQueue()
+
 proc print(s: string, null: bool) =
   if numPrinted < 8192:
     stdout.write s & (if null: '\0' else: '\n')
@@ -173,15 +196,6 @@ proc notFoundPrint() =
         withLock(printLock):
           writePrintQueue()
 
-func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
-  result = prefix
-  if not path.isAbsolute:
-    result.add cwd
-  result.add encodeHyperlink(path.string)
-  result.add "\e\\"
-  result.add display
-  result.add "\e]8;;\e\\"
-
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption) {.gcsafe.} =
@@ -198,16 +212,9 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     template wasFound =
       case behavior.kind
       of plainPrint:
-        if behavior.hyperlink:
-          print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd), behavior.null)
-        else:
-          print(path.string, behavior.null)
+        print(path, behavior)
       of coloredPrint:
-        let display = ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns))
-        if behavior.hyperlink:
-          print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, display), behavior.null)
-        else:
-          print(display, behavior.null)
+        print(path, behavior, ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)))
       of collect: findings.add descendent.toFound(path, matches = found)
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
@@ -277,15 +284,9 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
               Found(path: path.stripDot, kind: info.kind, matches: found)
           case behavior.kind
           of plainPrint:
-            if behavior.hyperlink:
-              print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd), behavior.null)
-            else:
-              print(path.string, behavior.null)
+            print(path, behavior)
           of coloredPrint:
-            if behavior.hyperlink:
-              print(wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, color(statFound(), patterns)), behavior.null)
-            else:
-              print(color(statFound(), patterns), behavior.null)
+            print(path, behavior, color(statFound(), patterns))
           of collect: findings.add statFound()
           of exec: run(m.getHandle, behavior.cmds, statFound())
         elif behavior.kind in {plainPrint, coloredPrint}:

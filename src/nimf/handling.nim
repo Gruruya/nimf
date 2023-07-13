@@ -69,7 +69,7 @@ func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
       result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
-proc init*(T: type Command; line: string): T =
+func init*(T: type Command; line: string): T =
   result = T(line: line, allIndexes: line.findAll(Targets))
   result.placements = result.allIndexes.kwayMerge
 
