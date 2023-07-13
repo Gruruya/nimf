@@ -38,7 +38,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.inverse; input: seq[string]): int =
+proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input

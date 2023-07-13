@@ -19,7 +19,7 @@ The pattern will only match with the filename unless you include a `/`.
 Options:
   -h, --help                            print this cligen-erated help
   --help-syntax                         advanced: prepend,plurals,..
-  -c=, --color=         bool     ?      set color
+  -c=, --color=         Flag     auto   Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.
   -e=, --execute=       strings  {}     Execute a command for each matching search result in parallel.
                                         Alternatively, end this argument with "+" to execute the command once with all results as arguments.
                                         Example: f .nim -e "$EDITOR"+
@@ -33,7 +33,7 @@ Options:
                                         If no placeholder is present, an implicit " {}" at the end is assumed.
   -L, --followSymlinks  bool     false  set followSymlinks
   -0, --null            bool     false  Separate search results and split stdin with null characters `\0` instead of newlines `\n`.
-  --hyperlink           bool     false  Enable clickable hyperlinks in supported terminals.
+  --hyperlink=          Flag     false  Enable clickable hyperlinks in supported terminals.
 ```
 
 ---
