@@ -7,25 +7,26 @@ import ./nimf/[find, findFiles, color, handling],
        pkg/[cligen, cligen/argcvt],
        std/[paths, terminal, exitprocs]
 import std/os except getCurrentDir
-from   std/strutils import startsWith
+from   std/strutils import startsWith, toLowerAscii
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 
-# `options.Option` but also stores the input so we can negate flags without values like `-c`
-type Param[T] = object
-  val*: T
-  set*: bool
-  input*: string
-proc filled[T](val: sink T): Param[T] {.inline.} =
-  result.set = true
-  result.val = val
-proc blank[T](val: sink T): Param[T] {.inline.} =
-  result.set = false
-  result.val = val
-proc blank(T: typedesc): Param[T] {.inline.} = Param[T]()
-proc blank[T]: Param[T] {.inline.} = blank(T)
-proc isSet[T](self: Param[T]): bool {.inline.} = self.set
-proc isUnset[T](self: Param[T]): bool {.inline.} = not self.set
+type Flag {.pure.} = enum
+  true, false, auto, inverse
+
+func `not`(flag: Flag): Flag =
+  case flag
+  of Flag.true: Flag.false
+  of Flag.false: Flag.true
+  of Flag.auto: Flag.inverse
+  of Flag.inverse: Flag.auto
+
+func toBool(flag: Flag; auto = true, inverse = false, true = true, false = false): bool =
+  case flag
+  of Flag.auto: auto
+  of Flag.inverse: inverse
+  of Flag.true: true
+  of Flag.false: false
 
 func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
   ## Overwrites `x[i]` with `y`
@@ -37,8 +38,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = false; null = false;
-  hyperlink = false; input: seq[string]): int =
+proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.inverse; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -82,11 +82,9 @@ proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = 
     traverseFind(paths, patterns, {pcFile, pcDir, pcLinkToFile, pcLinkToDir}, followSymlinks, andDo)
 
   if execute.len == 0:
-    let isatty = stdout.isatty
-    let envColorEnabled = isatty and getEnv("NO_COLOR").len == 0
-    let displayColor = color.isUnset and envColorEnabled or
-                       color.isSet and (if color.input.len == 0: (if not isatty: false else: not envColorEnabled) else: color.val)
-    let hyperlink = isatty and hyperlink
+    let isatty = stdout.isatty # We only write to stdout for explicit `yes` options
+    let displayColor = color.toBool(auto = isatty and getEnv("NO_COLOR").len == 0, inverse = isatty and getEnv("NO_COLOR").len != 0)
+    let hyperlink = hyperlink.toBool(auto = isatty)
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
@@ -102,12 +100,23 @@ proc cliFind*(color = blank(bool); execute = newSeq[string](); followSymlinks = 
       discard traverse(runOption(kind: exec, cmds: cmds))
 
 # Special argument parsing
-proc argParse[T](dst: var Param[T], dfl: Param[T], a: var ArgcvtParams): bool =
-  var uw: T # An unwrapped value
-  result = argParse(uw, (if dfl.isSet: dfl.val else: uw), a)
-  if result: dst = filled uw; dst.input = a.val
-proc argHelp[T](dfl: Param[T]; a: var ArgcvtParams): seq[string] =
-  @[a.argKeys, $T, (if dfl.isSet: $dfl.val else: "?")]
+proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
+  if len(a.val) > 0:
+    case a.val.toLowerAscii  # Like `argParse(dst: var bool...)` but we also accept a&i
+    of "t", "true" , "yes", "y", "1", "on" : dst = Flag.true
+    of "f", "false", "no" , "n", "0", "off": dst = Flag.false
+    of "a", "auto", "default": dst = Flag.auto
+    of "i", "inv", "inverse", "invert", "inverted": dst = Flag.inverse
+    else:
+      a.msg = "Flag option \"$1\" non-flag argument (\"$2\")\n$3" %
+              [ a.key, a.val, a.help ]
+      return false
+  else: # No option arg => reverse of default
+    dst =
+      case dfl
+      of Flag.true, Flag.auto: Flag.inverse
+      of Flag.false, Flag.inverse: Flag.auto
+  return true
 
 proc f*() =
   dispatch(cliFind,
@@ -128,6 +137,7 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
+                    "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                     "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
                     "hyperlink": "Enable clickable hyperlinks in supported terminals."})
 
