@@ -185,6 +185,10 @@ func argHelp*(dfl: set[PathComponent], a: var ArgcvtParams): seq[string]=
   result = @[ a.argKeys, typ, df ]
 
 proc f*() =
+  const nimbleFile = staticRead(currentSourcePath().parentDir.parentDir / "nimf.nimble")
+  const commitID = staticExec("git log -n 1 --format=%H").strip() # Not sure if `.strip()` is needed, but whatever.
+  clCfg.version = "nimf " & nimbleFile.fromNimble("version") & " " & commitID
+
   dispatch(cliFind,
            cmdName = "f",
            usage = (try: getAppFilename().lastPathPart except: "f") & " $args\n\n" &
