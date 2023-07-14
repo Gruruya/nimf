@@ -156,7 +156,7 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
       else: dst.incl argAggSplit(a, false)
       return
 
-    if a.val == "" and a.sep == ",=":
+    if a.val == "" and a.sep == ",=": # clear
       dst = {}; return
 
     case a.sep

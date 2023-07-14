@@ -56,9 +56,44 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 
 var findings = Findings.init()
 
+func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): bool {.inline.} =
+  ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`
+  assert last < subEnd - subStart
+  for i in substr.low..subEnd - subStart:
+    if text[last - (subEnd - subStart - i)] != substr[i + subStart]: return false
+  result = true
+
+func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural; cmp: proc): bool {.inline.} =
+  ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`, custom comparison procedure variant
+  assert last < subEnd - subStart
+  for i in substr.low..subEnd - subStart:
+    if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return false
+  result = true
+
+func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive: bool): bool {.inline.} =
+  ## preceedsWith but treats the beginning and end of the `text` the same as a `/` character
+  template redirect(last = last; subStart = substr.low; subEnd = substr.high): untyped =
+    if sensitive: path.string.preceedsWith(substr, last, subStart, subEnd)
+    else: path.string.preceedsWith(substr, last, subStart, subEnd, cmp = cmpInsensitive)
+
+  if last == path.string.high and substr[^1] == '/':
+    if path.string[^1] != '/': redirect(subEnd = substr.high - 1)
+    else: redirect(last - 1, subEnd = substr.high - 1)
+  elif last == substr.high and substr[0] == '/':
+    if path.string[0] != '/': redirect(last - 1, subStart = substr.low + 1)
+    else: redirect(subEnd = substr.high - 1)
+  else: redirect()
+
+func rfind(path: Path, pattern: openArray[char]; start, last: Natural; sensitive: bool): Option[Natural] {.inline.} =
+  for i in countdown(last, start):
+    if path.preceedsWith(pattern, i, sensitive):
+      return some i
+  result = none Natural
+
 proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
   if patterns.len == 0: return @[]
+  result = newSeq[(int, int)](patterns.len)
 
   var filenameSep = -1
   for i in countdown(patterns.high, patterns.low):
@@ -69,12 +104,8 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
     if path.string.len == 1: 0
     else: path.string.rfind("/", last = path.string.high - 1).get(0)
 
-  result = newSeq[(int, int)](patterns.len)
   var last = path.string.high
-
   let sensitive = patterns.containsAny({'A'..'Z'})
-  template smartrfind(args: varargs[untyped]): untyped =
-    if sensitive: rfind(args) else: rfindI(args)
 
   for i in countdown(patterns.high, patterns.low):
     if last < 0: return @[]
@@ -82,7 +113,7 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
     if pattern.len == 0:
       result[i] = (0, 0)
     else:
-      let found = smartrfind(path.string, pattern, start = if i > filenameSep: lastSep else: 0, last)
+      let found = rfind(path, pattern, start = if i > filenameSep: lastSep else: 0, last, sensitive)
       if found.isNone: return @[]
       result[i][1] = found.unsafeGet
       result[i][0] = result[i][1] - pattern.high
