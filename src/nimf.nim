@@ -99,8 +99,8 @@ proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = fa
 proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   if len(a.val) > 0:
     case a.val.toLowerAscii  # Like `argParse(dst: var bool...)` but we also accept a&i
-    of "t", "true" , "yes", "y", "1", "on" : dst = Flag.true
-    of "f", "false", "no" , "n", "0", "off": dst = Flag.false
+    of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.true
+    of "f", "false", "no" , "n", "0", "off", "never": dst = Flag.false
     of "a", "auto", "default": dst = Flag.auto
     of "i", "inv", "inverse", "invert", "inverted": dst = Flag.inverse
     else:
