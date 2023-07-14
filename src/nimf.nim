@@ -132,6 +132,10 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
   try:
     proc argAggSplit(a: var ArgcvtParams, split=true): set[PathComponent] =
       ## Similar to `argAggSplit` but specialized for set[PathComponent] using the `FileKind` enum for English options
+      if a.val.len == 0:
+        a.msg = "No value set for option \"$1$2\"\n" % [a.key, a.sep]
+        raise newException(ElementError, "No value")
+
       let toks = if split: a.val[1..^1].split(a.val[0]) else: @[ move(a.val) ]
       let old = a.sep; a.sep = ""
       for i, tok in toks:
@@ -152,9 +156,8 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
       else: dst.incl argAggSplit(a, false)
       return
 
-    if a.val.len == 0:
-      a.msg = "No value set for option \"$1$2\"\n" % [a.key, a.sep]
-      raise newException(ElementError, "No value")
+    if a.val == "" and a.sep == ",=":
+      dst = {}; return
 
     case a.sep
     of "+=": dst.incl argAggSplit(a, false)
