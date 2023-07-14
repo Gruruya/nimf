@@ -148,19 +148,23 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
       a.sep = old #probably don't need to restore, but eh.
 
     if a.sep.len <= 1:                      # no sep|no op => append
-      if first: dst = argAggSplit(a, false) # overwrite defaults if first sep is `=`
+      if first: dst = argAggSplit(a, false) # overwrite defaults if first use is assignment
       else: dst.incl argAggSplit(a, false)
       return
-    if   a.sep == "+=": dst.incl argAggSplit(a, false)
-    elif a.sep == "-=": dst.excl argAggSplit(a, false)
-    elif a.val == "" and a.sep == ",=":     # just clobber
-      dst = {}
-    elif a.sep == ",@=":                    # split-clobber-assign
-      dst = argAggSplit(a)
-    elif a.sep == ",=" or a.sep == ",+=":   # split-include
-      dst.incl argAggSplit(a)
-    elif a.sep == ",-=":                    # split-exclude
-      dst.excl argAggSplit(a)
+
+    if a.val.len == 0:
+      a.msg = "No value set for option \"$1$2\"\n" % [a.key, a.sep]
+      raise newException(ElementError, "No value")
+
+    case a.sep
+    of "+=": dst.incl argAggSplit(a, false)
+    of "-=": dst.excl argAggSplit(a, false)
+    of ",=":                          # split-assign
+      if first: dst = argAggSplit(a)
+      else: dst.incl argAggSplit(a)
+    of ",@=": dst = argAggSplit(a)    # split-clobber-assign
+    of ",+=": dst.incl argAggSplit(a) # split-include
+    of ",-=": dst.excl argAggSplit(a) # split-exclude
     else:
       a.msg = "Bad operator (\"$1\") for set of types, param $2\n" % [a.sep, a.key]
       raise newException(ElementError, "Bad operator")
