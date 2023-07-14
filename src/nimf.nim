@@ -13,16 +13,16 @@ from   std/typetraits import enumLen
 
 type Flag {.pure.} = enum
   ## `bool` but with `auto` and `inverse`
-  ## `true` and `false` mean explicitly always enable and disable
+  ## `always` and `never` mean explicitly always enable and disable
   ##  while `auto` and `inverse` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
-  true, false, auto, inverse
+  always, never, auto, inverse
 
-func toBool(flag: Flag; auto = true, inverse = false, true = true, false = false): bool =
+func toBool(flag: Flag; auto = true, inverse = false, always = true, never = false): bool =
   case flag
   of Flag.auto: auto
   of Flag.inverse: inverse
-  of Flag.true: true
-  of Flag.false: false
+  of Flag.always: true
+  of Flag.never: false
 
 func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
   ## Overwrites `x[i]` with `y`
@@ -34,7 +34,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.never; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -99,9 +99,9 @@ proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = fa
 proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   if len(a.val) > 0:
     case a.val.toLowerAscii  # Like `argParse(dst: var bool...)` but we also accept a&i
-    of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.true
-    of "f", "false", "no" , "n", "0", "off", "never": dst = Flag.false
-    of "a", "auto", "default": dst = Flag.auto
+    of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.always
+    of "f", "false", "no" , "n", "0", "off", "never": dst = Flag.never
+    of "a", "auto": dst = Flag.auto
     of "i", "inv", "inverse", "invert", "inverted": dst = Flag.inverse
     else:
       a.msg = "Flag option \"$1\" non-flag argument (\"$2\")\n$3" %
@@ -110,8 +110,8 @@ proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   else: # No option arg => reverse of default
     dst =
       case dfl
-      of Flag.true, Flag.auto: Flag.inverse
-      of Flag.false, Flag.inverse: Flag.auto
+      of Flag.always, Flag.auto: Flag.inverse
+      of Flag.never, Flag.inverse: Flag.auto
   return true
 
 proc f*() =
