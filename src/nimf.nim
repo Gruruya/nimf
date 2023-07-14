@@ -103,6 +103,7 @@ proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
     of "f", "false", "no" , "n", "0", "off", "never": dst = Flag.never
     of "a", "auto": dst = Flag.auto
     of "i", "inv", "inverse", "invert", "inverted": dst = Flag.inverse
+    of "d", "default": dst = dfl
     else:
       a.msg = "Flag option \"$1\" non-flag argument (\"$2\")\n$3" %
               [ a.key, a.val, a.help ]
