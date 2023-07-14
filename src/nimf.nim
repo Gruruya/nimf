@@ -38,7 +38,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(filetype = Filetype.any; color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(filetype = Filetype.any; execute = newSeq[string](); followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -142,7 +142,7 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
-                    "filetype": "Select which file types to match, must be one of any|file|directory",
+                    "filetype": "Select which file type(s) to match, must be one of any|file|directory.",
                     "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                     "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
                     "hyperlink": "Enable clickable hyperlinks in supported terminals."})
