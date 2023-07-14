@@ -56,27 +56,28 @@ template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenO
 
 var findings = Findings.init()
 
-func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): bool {.inline.} =
+func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`
   assert last < subEnd - subStart
   for i in substr.low..subEnd - subStart:
-    if text[last - (subEnd - subStart - i)] != substr[i + subStart]: return false
-  result = true
+    if text[last - (subEnd - subStart - i)] != substr[i + subStart]: return
+  result = some (Natural(last - (subEnd - subStart)), last)
 
-func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural; cmp: proc): bool {.inline.} =
+func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural; cmp: proc): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`, custom comparison procedure variant
   assert last < subEnd - subStart
   for i in substr.low..subEnd - subStart:
-    if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return false
-  result = true
+    if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return
+  result = some (Natural(last - (subEnd - subStart)), last)
 
-func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive: bool): bool {.inline.} =
+func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
   ## preceedsWith but treats the beginning and end of the `text` the same as a `/` character
   template redirect(last = last; subStart = substr.low; subEnd = substr.high): untyped =
     if sensitive: path.string.preceedsWith(substr, last, subStart, subEnd)
     else: path.string.preceedsWith(substr, last, subStart, subEnd, cmp = cmpInsensitive)
 
-  if substr.len == 1: return path.string[last] == substr[0]
+  if substr.len == 1:
+    if path.string[last] == substr[0]: return some (last, last) else: return
   if last == path.string.high and substr[^1] == '/':
     if path.string[^1] != '/': redirect(subEnd = substr.high - 1)
     else: redirect(last - 1, subEnd = substr.high - 1)
@@ -85,11 +86,11 @@ func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive:
     else: redirect(subEnd = substr.high - 1)
   else: redirect()
 
-func rfind(path: Path, pattern: openArray[char]; start, last: Natural; sensitive: bool): Option[Natural] {.inline.} =
+func rfind(path: Path, pattern: openArray[char]; start, last: Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
   for i in countdown(last, start):
-    if path.preceedsWith(pattern, i, sensitive):
-      return some i
-  result = none Natural
+    let ret = path.preceedsWith(pattern, i, sensitive)
+    if ret.isSome: return ret
+  result = none (Natural, Natural)
 
 proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
@@ -116,8 +117,7 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
     else:
       let found = rfind(path, pattern, start = if i > filenameSep: lastSep else: 0, last, sensitive)
       if found.isNone: return @[]
-      result[i][1] = found.unsafeGet
-      result[i][0] = result[i][1] - pattern.high
+      result[i] = found.unsafeGet
       last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
