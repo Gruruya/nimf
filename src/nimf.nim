@@ -35,7 +35,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(filetypes = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -76,7 +76,7 @@ proc cliFind*(filetypes = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = 
   if paths.len == 0: paths = @[Path(".")]
 
   template traverse(andDo: runOption): untyped =
-    traverseFind(paths, patterns, filetypes, followSymlinks, andDo)
+    traverseFind(paths, patterns, types, followSymlinks, andDo)
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
@@ -116,10 +116,10 @@ func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
       of Flag.false, Flag.contra: Flag.auto
   return true
 
-type Filetype = enum
+type FileKind = enum
   file, directory, link, any
 
-func to(filetype: Filetype, T: type set[PathComponent]): T =
+func to(filetype: FileKind, T: type set[PathComponent]): T =
   case filetype
   of file: {pcFile}
   of directory: {pcDir}
@@ -131,12 +131,12 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
   result = true
   try:
     proc argAggSplit(a: var ArgcvtParams, split=true): set[PathComponent] =
-      ## Similar to `argAggSplit` but specialized for set[PathComponent] using the `Filetype` enum for English options
+      ## Similar to `argAggSplit` but specialized for set[PathComponent] using the `FileKind` enum for English options
       let toks = if split: a.val[1..^1].split(a.val[0]) else: @[ move(a.val) ]
       let old = a.sep; a.sep = ""
       for i, tok in toks:
 
-        var parsed, default: set[Filetype]
+        var parsed, default: set[FileKind]
         a.val = tok
 
         if not argParse(parsed, default, a):
@@ -161,7 +161,7 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
     elif a.sep == ",-=":                    # split-exclude
       dst.excl(argAggSplit(a))
     else:
-      a.msg = "Bad operator (\"$1\") for set of filetypes, param $2\n" % [a.sep, a.key]
+      a.msg = "Bad operator (\"$1\") for set of types, param $2\n" % [a.sep, a.key]
       raise newException(ElementError, "Bad operator")
   except:
     return false
@@ -183,8 +183,9 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"followSymlinks": 'L', "null": '0', "filetypes": 't'},
-           help = {"execute": "Execute a command for each matching search result in parallel.\n" &
+           short = {"followSymlinks": 'L', "null": '0', "types": 't'},
+           help = {"types": "Select which file kind(s) to match. File kinds include any|file|directory|link.",
+                   "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
                               "The following placeholders are substituted before the command is executed:\n" &
@@ -195,10 +196,9 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
-                    "filetypes": "Select which file type(s) to match. file types are any|file|directory|link",
-                    "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
-                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
-                    "hyperlink": "Enable clickable hyperlinks in supported terminals."})
+                   "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
+                   "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
+                   "hyperlink": "Enable clickable hyperlinks in supported terminals."})
 
 when isMainModule:
   f()
