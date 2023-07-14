@@ -147,8 +147,8 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
           result.incl t.to(set[PathComponent])
       a.sep = old #probably don't need to restore, but eh.
 
-    if a.sep.len <= 1:                      # No Sep|No Op => Append
-      if first: dst = argAggSplit(a, false) # Overwrite defaults if its the first use of this flag
+    if a.sep.len <= 1:                      # no sep|no op => append
+      if first: dst = argAggSplit(a, false) # overwrite defaults if first sep is `=`
       else: dst.incl argAggSplit(a, false)
       return
     if   a.sep == "+=": dst.incl argAggSplit(a, false)
