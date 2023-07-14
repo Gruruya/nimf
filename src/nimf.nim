@@ -11,11 +11,15 @@ from   std/strutils import startsWith, toLowerAscii
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 
-type Flag {.pure.} = enum
-  ## `bool` but with `auto` and `contra`
-  ## `true` and `false` mean explicitly always enable and disable
-  ##  while `auto` and `contra` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
-  true, false, auto, contra
+type
+  Flag {.pure.} = enum
+    ## `bool` but with `auto` and `contra`
+    ## `true` and `false` mean explicitly always enable and disable
+    ##  while `auto` and `contra` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
+    true, false, auto, contra
+
+  Filetype {.pure.} = enum
+    file, directory, any
 
 func toBool(flag: Flag; auto = true, contra = false, true: static bool = true, false: static bool = false): bool {.inline.} =
   case flag
@@ -34,7 +38,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(filetype = Filetype.any; color = Flag.auto; execute = newSeq[string](); followSymlinks = false; null = false; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -75,7 +79,11 @@ proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = fa
   if paths.len == 0: paths = @[Path(".")]
 
   template traverse(andDo: runOption): untyped =
-    traverseFind(paths, patterns, {pcFile, pcDir, pcLinkToFile, pcLinkToDir}, followSymlinks, andDo)
+    let filetypes = case filetype:
+                    of Filetype.file: {pcFile, pcLinkToFile}
+                    of Filetype.directory: {pcDir, pcLinkToDir}
+                    else: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
+    traverseFind(paths, patterns, filetypes, followSymlinks, andDo)
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
@@ -122,7 +130,7 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"followSymlinks": 'L', "null": '0'},
+           short = {"followSymlinks": 'L', "null": '0', "filetype": 't'},
            help = {"execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
@@ -134,6 +142,7 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
+                    "filetype": "Select which file types to match, must be one of any|file|directory",
                     "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                     "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
                     "hyperlink": "Enable clickable hyperlinks in supported terminals."})
