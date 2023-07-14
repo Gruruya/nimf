@@ -58,14 +58,12 @@ var findings = Findings.init()
 
 func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`
-  assert last < subEnd - subStart
   for i in substr.low..subEnd - subStart:
     if text[last - (subEnd - subStart - i)] != substr[i + subStart]: return
   result = some (Natural(last - (subEnd - subStart)), last)
 
 func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural; cmp: proc): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`, custom comparison procedure variant
-  assert last < subEnd - subStart
   for i in substr.low..subEnd - subStart:
     if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return
   result = some (Natural(last - (subEnd - subStart)), last)
