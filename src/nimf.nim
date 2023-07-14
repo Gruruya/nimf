@@ -101,8 +101,8 @@ proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
     case a.val.toLowerAscii  # Like `argParse(dst: var bool...)` but we also accept a&i
     of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.true
     of "f", "false", "no" , "n", "0", "off", "never": dst = Flag.false
-    of "a", "auto": dst = Flag.auto
-    of "i", "inv", "inverse", "invert", "inverted": dst = Flag.inverse
+    of "a", "auto": dst = Flag.auto # "a" could be confused for "always"
+    of "i", "inverse": dst = Flag.inverse
     of "d", "default", "unset": dst = dfl
     else:
       a.msg = "Flag option \"$1\" non-flag argument (\"$2\")\n$3" %
