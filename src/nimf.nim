@@ -18,9 +18,6 @@ type
     ##  while `auto` and `contra` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
     true, false, auto, contra
 
-  Filetype {.pure.} = enum
-    file, directory, any
-
 func toBool(flag: Flag; auto = true, contra = false, true: static bool = true, false: static bool = false): bool {.inline.} =
   case flag
   of Flag.auto: auto
@@ -38,7 +35,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(filetype = Filetype.any; execute = newSeq[string](); followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(filetypes = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -79,10 +76,6 @@ proc cliFind*(filetype = Filetype.any; execute = newSeq[string](); followSymlink
   if paths.len == 0: paths = @[Path(".")]
 
   template traverse(andDo: runOption): untyped =
-    let filetypes = case filetype:
-                    of Filetype.file: {pcFile, pcLinkToFile}
-                    of Filetype.directory: {pcDir, pcLinkToDir}
-                    else: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
     traverseFind(paths, patterns, filetypes, followSymlinks, andDo)
 
   if execute.len == 0:
@@ -104,7 +97,7 @@ proc cliFind*(filetype = Filetype.any; execute = newSeq[string](); followSymlink
       discard traverse(runOption(kind: exec, cmds: cmds))
 
 # Special argument parsing
-proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
+func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   if len(a.val) > 0:
     case a.val.toLowerAscii  # Like `argParse(dst: var bool...)` but we also accept a&i
     of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.true
@@ -123,6 +116,66 @@ proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
       of Flag.false, Flag.contra: Flag.auto
   return true
 
+type Filetype = enum
+  file, directory, link, any
+
+func to(filetype: Filetype, T: type set[PathComponent]): T =
+  case filetype
+  of file: {pcFile}
+  of directory: {pcDir}
+  of link: {pcLinkToFile, pcLinkToDir}
+  of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
+
+proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var ArgcvtParams): bool =
+  once: dst = {} # Clear defaults if the flag was set
+  result = true
+  try:
+    proc argAggSplit(a: var ArgcvtParams, split=true): set[PathComponent] =
+      ## Similar to `argAggSplit` but specialized for set[PathComponent] using the `Filetype` enum for English options
+      let toks = if split: a.val[1..^1].split(a.val[0]) else: @[ move(a.val) ]
+      let old = a.sep; a.sep = ""
+      for i, tok in toks:
+
+        var parsed, default: set[Filetype]
+        a.val = tok
+
+        if not argParse(parsed, default, a):
+          result = {}; a.sep = old
+          raise newException(ElementError, "Bad element " & $i)
+
+        for t in parsed:
+          result.incl t.to(set[PathComponent])
+      a.sep = old #probably don't need to restore, but eh.
+
+    if a.sep.len <= 1:                      # No Sep|No Op => Append
+      dst.incl(argAggSplit(a, false))
+      return
+    if   a.sep == "+=": dst.incl(argAggSplit(a, false))
+    elif a.sep == "-=": dst.excl(argAggSplit(a, false))
+    elif a.val == "" and a.sep == ",=":     # just clobber
+      dst = {}
+    elif a.sep == ",@=":                    # split-clobber-assign
+      dst = {}; dst.incl(argAggSplit(a))
+    elif a.sep == ",=" or a.sep == ",+=":   # split-include
+      dst.incl(argAggSplit(a))
+    elif a.sep == ",-=":                    # split-exclude
+      dst.excl(argAggSplit(a))
+    else:
+      a.msg = "Bad operator (\"$1\") for set of filetypes, param $2\n" % [a.sep, a.key]
+      raise newException(ElementError, "Bad operator")
+  except:
+    return false
+
+func argHelp*(dfl: set[PathComponent], a: var ArgcvtParams): seq[string]=
+  var typ = "filetype"; var df: string
+  var dflSeq: seq[string]
+  if dfl == {pcFile, pcDir, pcLinkToFile, pcLinkToDir}:
+    dflSeq = @["any"]
+  else:
+    for d in dfl: dflSeq.add($d)
+  argAggHelp(dflSeq, "set", typ, df)
+  result = @[ a.argKeys, typ, df ]
+
 proc f*() =
   dispatch(cliFind,
            cmdName = "f",
@@ -130,7 +183,7 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"followSymlinks": 'L', "null": '0', "filetype": 't'},
+           short = {"followSymlinks": 'L', "null": '0', "filetypes": 't'},
            help = {"execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
@@ -142,7 +195,7 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
-                    "filetype": "Select which file type(s) to match, must be one of any|file|directory.",
+                    "filetypes": "Select which file type(s) to match. file types are any|file|directory|link",
                     "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                     "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
                     "hyperlink": "Enable clickable hyperlinks in supported terminals."})
