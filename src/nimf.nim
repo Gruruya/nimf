@@ -12,15 +12,15 @@ from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 
 type Flag {.pure.} = enum
-  ## `bool` but with `auto` and `inverse`
+  ## `bool` but with `auto` and `contra`
   ## `true` and `false` mean explicitly always enable and disable
-  ##  while `auto` and `inverse` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
-  true, false, auto, inverse
+  ##  while `auto` and `contra` act as "sane defaults" and are contigent on something else (like if we're outputting to a tty)
+  true, false, auto, contra
 
-func toBool(flag: Flag; auto = true, inverse = false, true = true, false = false): bool =
+func toBool(flag: Flag; auto = true, contra = false, true: static bool = true, false: static bool = false): bool {.inline.} =
   case flag
   of Flag.auto: auto
-  of Flag.inverse: inverse
+  of Flag.contra: contra
   of Flag.true: true
   of Flag.false: false
 
@@ -79,7 +79,7 @@ proc cliFind*(color = Flag.auto; execute = newSeq[string](); followSymlinks = fa
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
-    let displayColor = color.toBool(auto = toatty and getEnv("NO_COLOR").len == 0, inverse = toatty and getEnv("NO_COLOR").len != 0)
+    let displayColor = color.toBool(auto = toatty and getEnv("NO_COLOR").len == 0, contra = toatty and getEnv("NO_COLOR").len != 0)
     let hyperlink = hyperlink.toBool(auto = toatty)
     if displayColor:
       lscolors = parseLSColorsEnv()
@@ -102,7 +102,7 @@ proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
     of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.true
     of "f", "false", "no" , "n", "0", "off", "never": dst = Flag.false
     of "a", "auto": dst = Flag.auto # "a" could be confused for "always"
-    of "i", "inverse": dst = Flag.inverse
+    of "c", "contra", "contraauto", "contrauto": dst = Flag.contra
     of "d", "default", "unset": dst = dfl
     else:
       a.msg = "Flag option \"$1\" non-flag argument (\"$2\")\n$3" %
@@ -111,8 +111,8 @@ proc argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   else: # No option arg => reverse of default
     dst =
       case dfl
-      of Flag.true, Flag.auto: Flag.inverse
-      of Flag.false, Flag.inverse: Flag.auto
+      of Flag.true, Flag.auto: Flag.contra
+      of Flag.false, Flag.contra: Flag.auto
   return true
 
 proc f*() =
