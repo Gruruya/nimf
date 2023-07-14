@@ -127,7 +127,7 @@ func to(filetype: FileKind, T: type set[PathComponent]): T =
   of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
 
 proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var ArgcvtParams): bool =
-  once: dst = {} # Clear defaults if the flag was set
+  var first = false; once: first = true
   result = true
   try:
     proc argAggSplit(a: var ArgcvtParams, split=true): set[PathComponent] =
@@ -148,18 +148,19 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
       a.sep = old #probably don't need to restore, but eh.
 
     if a.sep.len <= 1:                      # No Sep|No Op => Append
-      dst.incl(argAggSplit(a, false))
+      if first: dst = argAggSplit(a, false) # Overwrite defaults if its the first use of this flag
+      else: dst.incl argAggSplit(a, false)
       return
-    if   a.sep == "+=": dst.incl(argAggSplit(a, false))
-    elif a.sep == "-=": dst.excl(argAggSplit(a, false))
+    if   a.sep == "+=": dst.incl argAggSplit(a, false)
+    elif a.sep == "-=": dst.excl argAggSplit(a, false)
     elif a.val == "" and a.sep == ",=":     # just clobber
       dst = {}
     elif a.sep == ",@=":                    # split-clobber-assign
-      dst = {}; dst.incl(argAggSplit(a))
+      dst = argAggSplit(a)
     elif a.sep == ",=" or a.sep == ",+=":   # split-include
-      dst.incl(argAggSplit(a))
+      dst.incl argAggSplit(a)
     elif a.sep == ",-=":                    # split-exclude
-      dst.excl(argAggSplit(a))
+      dst.excl argAggSplit(a)
     else:
       a.msg = "Bad operator (\"$1\") for set of types, param $2\n" % [a.sep, a.key]
       raise newException(ElementError, "Bad operator")
