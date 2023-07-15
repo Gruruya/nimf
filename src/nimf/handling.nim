@@ -73,15 +73,19 @@ func init*(T: type Command; line: string): T =
   result = T(line: line, allIndexes: line.findAll(Targets))
   result.placements = result.allIndexes.kwayMerge
 
-template add(x: var string, j: varargs[string]) =
-  for y in j: system.add(x, y)
+template add(x: var string, y: varargs[string]) =
+  for j in y: system.add(x, j)
+
+template getIt[T, R](self: Option[T], callback: untyped; otherwise: R): R =
+  if self.isSome:
+    let it {.inject.} = self.unsafeGet
+    callback
+  else:
+    otherwise
 
 proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
-  let parentSep = block:
-    let lastSlash = path.rfind("/", last = path.high - 1)
-    if lastSlash.isNone: -1
-    else: lastSlash.unsafeGet
+  let parentSep = path.rfind("/", last = path.high - 1).getIt(it.int, -1)
 
   let dirColor = getOrDefault(lscolors.types, etDirectory, defaultStyle()).toAnsiCode
   let fileColor =
