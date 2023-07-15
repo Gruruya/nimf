@@ -78,7 +78,7 @@ template add(x: var string, j: varargs[string]) =
 
 proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
-  let parentLen = block:
+  let parentSep = block:
     let lastSlash = path.rfind("/", last = path.high - 1)
     if lastSlash.isNone: -1
     else: lastSlash.unsafeGet
@@ -88,24 +88,24 @@ proc color*(found: Found, patterns: openArray[string]): string =
     if found.kind == pcDir: dirColor # optimization
     else: lscolors.styleForPath(found).toAnsiCode
   let highlightColor =
-    if likely "\e[1;31m" notin [dirColor, fileColor]: "\e[1;31m" # Bright red
-    elif "\e[1;33m" notin [dirColor, fileColor]: "\e[1;33m" # Bright yellow
-    else: "\e[1;36m" # Bright cyan (they have red/yellow as their other colors)
+     if likely "\e[1;31m" notin [dirColor, fileColor]: "\e[1;31m" # Bright red
+     elif "\e[1;33m" notin [dirColor, fileColor]: "\e[1;33m" # Bright yellow
+     else: "\e[1;36m" # Bright cyan (they have red/yellow as their other colors)
 
   if patterns == @[""]:
-    result = dirColor & path[0..parentLen]
-    result.add fileColor, path[parentLen + 1..^1]
+    result = dirColor & path[0..parentSep]
+    result.add fileColor, path[parentSep + 1..^1]
   else:
     var start = 0
     for i in 0..found.matches.high:
       let matchStart = found.matches[i][0]
       let matchEnd = found.matches[i][1]
 
-      if start > parentLen:
+      if start > parentSep:
         result.add fileColor, path[start ..< matchStart]
-      elif dirColor != fileColor and matchStart >= parentLen:
-        result.add dirColor, path[start .. parentLen - (if parentLen == matchStart: 1 else: 0)]
-        result.add fileColor, path[parentLen + 1 ..< matchStart]
+      elif dirColor != fileColor and matchStart >= parentSep:
+        result.add dirColor, path[start .. parentSep - (if parentSep == matchStart: 1 else: 0)]
+        result.add fileColor, path[parentSep + 1 ..< matchStart]
       else:
         result.add dirColor, path[start ..< matchStart]
 
@@ -113,11 +113,11 @@ proc color*(found: Found, patterns: openArray[string]): string =
       start = matchEnd + 1
 
     if start != path.len:
-      if start > parentLen or dirColor == fileColor:
+      if start > parentSep or dirColor == fileColor:
         result.add fileColor, path[start..path.high]
       else:
-        result.add dirColor, path[start .. parentLen]
-        result.add fileColor, path[parentLen + 1 .. path.high]
+        result.add dirColor, path[start .. parentSep]
+        result.add fileColor, path[parentSep + 1 .. path.high]
 
 template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
