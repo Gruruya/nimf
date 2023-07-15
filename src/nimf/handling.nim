@@ -76,9 +76,10 @@ func init*(T: type Command; line: string): T =
 template add(x: var string, y: varargs[string]) =
   for j in y: system.add(x, j)
 
-template getIt[T, R](self: Option[T], callback: untyped; otherwise: R): R =
-  if self.isSome:
-    let it {.inject.} = self.unsafeGet
+template getIt*[T, R](self: Option[T], callback: untyped; otherwise: R): R =
+  let tmp = self
+  if tmp.isSome:
+    template it: untyped {.inject.} = tmp.unsafeGet
     callback
   else:
     otherwise
