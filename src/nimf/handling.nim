@@ -151,12 +151,11 @@ func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: 
   ## Replaces at each `placements.where` index the `enum` text with `replacements[enum][index]`
   replaceAtImpl(indexing = true)
 
-proc execShell(cmd: string) = discard execShellCmd(cmd)
+func rstripSlash(s: sink string): string {.inline.} =
+  if s[^1] == '/': s.setLen(s.len - 1)
+  result = s
 
-template rstripSlash(s: string): string =
-  if unlikely s.len == 1: s
-  elif s[^1] == '/': s[0..^2]
-  else: s
+proc execShell(cmd: string) = discard execShellCmd(cmd)
 
 proc run*(cmds: sink seq[string], findings: seq[Found]) =
   ## Run the commands on the findings, used for after-the-fact/batched --exec
