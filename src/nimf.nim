@@ -95,8 +95,9 @@ proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newS
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(runOption(kind: exec, cmds: cmds))
 
-# Special argument parsing
+#[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
+  ## For `--flag=auto`, `contra` is equivalent to `--flag` without an argument (negating)
   if len(a.val) > 0:
     case a.val.toLowerAscii  # Like `argParse(dst: var bool...)` but we also accept a&i
     of "t", "true" , "yes", "y", "1", "on", "always": dst = Flag.true
@@ -115,6 +116,7 @@ func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
       of Flag.false, Flag.contra: Flag.auto
   return true
 
+# For `-t=f`
 type FileKind = enum
   file, directory, link, any
 
@@ -126,6 +128,7 @@ func to(filetype: FileKind, T: type set[PathComponent]): T =
   of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
 
 proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var ArgcvtParams): bool =
+  ## Parse `set[PathComponent]` as a `set[FileKind]`
   var first = false; once: first = true
   result = true
   try:
