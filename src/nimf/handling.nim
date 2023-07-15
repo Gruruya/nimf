@@ -4,7 +4,7 @@
 
 ## Procedures used once a file has matched.
 
-import ./[common, find, color], std/[os, terminal, paths, options, tables], pkg/malebolgia
+import ./[common, find, color], std/[os, paths, options, tables], pkg/malebolgia
 from   std/strutils import join
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
@@ -87,6 +87,10 @@ proc color*(found: Found, patterns: openArray[string]): string =
   let fileColor =
     if found.kind == pcDir: dirColor # optimization
     else: lscolors.styleForPath(found).toAnsiCode
+  let highlightColor =
+    if likely "\e[1;31m" notin [dirColor, fileColor]: "\e[1;31m" # Bright red
+    elif "\e[1;33m" notin [dirColor, fileColor]: "\e[1;33m" # Bright yellow
+    else: "\e[1;36m" # Bright cyan (they have red/yellow as their other colors)
 
   if patterns == @[""]:
     result = dirColor & path[0..parentLen]
@@ -105,7 +109,7 @@ proc color*(found: Found, patterns: openArray[string]): string =
       else:
         result.add dirColor, path[start ..< matchStart]
 
-      result.add "\e[1;" & $ord(fgRed) & 'm', path[matchStart..matchEnd]
+      result.add highlightColor, path[matchStart..matchEnd]
       start = matchEnd + 1
 
     if start != path.len:
@@ -150,7 +154,8 @@ func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: 
 proc execShell(cmd: string) = discard execShellCmd(cmd)
 
 proc run*(cmds: sink seq[string], findings: seq[Found]) =
-  ## Run the commands on the findings
+  ## Run the commands on the findings, used for after-the-fact/batched --exec
+  #TODO: Stream those which don't end in +
   template needs(t: Target) =
     if replacements[t].len == 0: replacements[t] =
       case t
@@ -197,7 +202,7 @@ proc run*(cmds: sink seq[string], findings: seq[Found]) =
           else: m.spawn execShell cmd.replaceAt(placements, replacements, i)
 
 proc run*(m: MasterHandle; cmds: seq[Command], found: Found) =
-  ## Run the commands on the findings
+  ## Run the commands on the findings, used for streaming --exec
   template needs(t: Target) =
     replacements[t] =
       case t
