@@ -153,16 +153,21 @@ func replaceAt[T: enum](text: string; placements: openArray[tuple[where, which: 
 
 proc execShell(cmd: string) = discard execShellCmd(cmd)
 
+template rstripSlash(s: string): string =
+  if unlikely s.len == 1: s
+  elif s[^1] == '/': s[0..^2]
+  else: s
+
 proc run*(cmds: sink seq[string], findings: seq[Found]) =
   ## Run the commands on the findings, used for after-the-fact/batched --exec
   #TODO: Stream those which don't end in +
   template needs(t: Target) =
     if replacements[t].len == 0: replacements[t] =
       case t
-      of toPaths: mapIt(findings, it.path.string.quoteShell)
+      of toPaths: mapIt(findings, it.path.string.rstripSlash.quoteShell)
       of toFilenames: mapIt(findings, it.path.lastPathPart.string.quoteShell)
       of toParentDirs: mapIt(findings, it.path.parentDir.string.quoteShell)
-      of toNoExtPaths: mapIt(findings, it.path.stripExtension.string.quoteShell)
+      of toNoExtPaths: mapIt(findings, it.path.stripExtension.string.rstripSlash.quoteShell)
       of toNoExtFilenames: mapEnumeratedIt(findings, if it.kind == pcDir:
                                                        if replacements[toFilenames].len > 0: replacements[toFilenames][i]
                                                        else: it.path.lastPathPart.string.quoteShell
@@ -206,10 +211,10 @@ proc run*(m: MasterHandle; cmds: seq[Command], found: Found) =
   template needs(t: Target) =
     replacements[t] =
       case t
-      of toPaths: found.path.string.quoteShell
+      of toPaths: found.path.string.rstripSlash.quoteShell
       of toFilenames: found.path.lastPathPart.string.quoteShell
       of toParentDirs: found.path.parentDir.string.quoteShell
-      of toNoExtPaths: found.path.stripExtension.string.quoteShell
+      of toNoExtPaths: found.path.stripExtension.string.rstripSlash.quoteShell
       of toNoExtFilenames: (if found.kind == pcDir: found.path.lastPathPart.string.quoteShell
                             else: found.path.splitFile[1].string.quoteShell)
 
