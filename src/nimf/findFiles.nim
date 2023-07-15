@@ -2,7 +2,8 @@
 # Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-## File path finding, posix only currently as it uses stat.
+## Main logic for nimf.
+## Posix only currently as it uses stat.
 
 import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
 
@@ -179,8 +180,7 @@ var numPrinted = 0 # If there's a low number of matches printing directly can be
 {.push inline.}
 
 proc writePrintQueue() =
-  stdout.write printQueue
-  stdout.flushFile()
+  stdout.write printQueue; stdout.flushFile()
   printQueue.setLen 0
   numFailed = 0
 
@@ -199,7 +199,7 @@ proc print(path: Path; behavior: runOption; display = path.string) =
      else: display) & (if behavior.null: '\0' else: '\n')
 
   if numPrinted < 8192:
-    stdout.write output()
+    stdout.write output(); stdout.flushFile()
     inc numPrinted
   else:
     withLock(printLock):
