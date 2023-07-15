@@ -86,7 +86,6 @@ proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newS
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
       discard traverse(runOption.init(coloredPrint, null, hyperlink))
-      stdout.flushFile()
     else:
       discard traverse(runOption.init(plainPrint, null, hyperlink))
   else:

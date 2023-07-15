@@ -180,6 +180,7 @@ var numPrinted = 0 # If there's a low number of matches printing directly can be
 
 proc writePrintQueue() =
   stdout.write printQueue
+  stdout.flushFile()
   printQueue.setLen 0
   numFailed = 0
 
@@ -309,6 +310,6 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
 
   case behavior.kind
   of plainPrint, coloredPrint:
-    if printQueue.len > 0: stdout.write printQueue
+    if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
   of collect: result &= findings.found.paths
   else: discard

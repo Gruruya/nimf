@@ -88,9 +88,9 @@ proc color*(found: Found, patterns: openArray[string]): string =
     if found.kind == pcDir: dirColor # optimization
     else: lscolors.styleForPath(found).toAnsiCode
   let highlightColor =
-     if likely "\e[1;31m" notin [dirColor, fileColor]: "\e[1;31m" # Bright red
-     elif "\e[1;33m" notin [dirColor, fileColor]: "\e[1;33m" # Bright yellow
-     else: "\e[1;36m" # Bright cyan (they have red/yellow as their other colors)
+    if likely "\e[1;31m" notin [dirColor, fileColor]: "\e[1;31m" # Bright red
+    elif "\e[1;33m" notin [dirColor, fileColor]: "\e[1;33m" # Bright yellow
+    else: "\e[1;36m" # Bright cyan (they have red/yellow as their other colors)
 
   if patterns == @[""]:
     result = dirColor & path[0..parentSep]
