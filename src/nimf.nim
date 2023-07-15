@@ -116,6 +116,12 @@ func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
       of Flag.false, Flag.contra: Flag.auto
   return true
 
+proc argHelp*(dfl: Flag; a: var ArgcvtParams): seq[string] =
+  result = @[ a.argKeys(argSep=""), "flag", $dfl ]
+  if a.parSh.len > 0:
+    a.shortNoVal.incl(a.parSh[0]) # flag can elide option arguments.
+  a.longNoVal.add(move(a.parNm))  # So, add to *NoVal.
+
 # For `-t=f`
 type FileKind = enum
   file, directory, link, any
