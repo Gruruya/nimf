@@ -89,10 +89,10 @@ proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
   let parentSep = path.rfind("/", last = path.high - 1).getIt(it.int, -1)
 
-  let dirColor = getOrDefault(lscolors.types, etDirectory, defaultStyle()).toAnsiCode
+  let dirColor = lscolors.types.getOrDefault(etDirectory, ansiResetCode)
   let fileColor =
     if found.kind == pcDir: dirColor # optimization
-    else: lscolors.styleForPath(found).toAnsiCode
+    else: lscolors.styleForPath(found)
   let highlightColor =
     if likely "\e[1;31m" notin [dirColor, fileColor]: "\e[1;31m" # Bright red
     elif "\e[1;33m" notin [dirColor, fileColor]: "\e[1;33m" # Bright yellow
