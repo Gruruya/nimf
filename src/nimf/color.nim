@@ -24,6 +24,7 @@ type
 template ansiCode*(s: string): string =
   "\e[" & s & 'm'
 
+const ansiResetCode* = ansiCode("0")
 const ansiDefaultForeground* = ansiCode("00;39")
 
 proc rawParse(str: string): seq[RawRule] =
@@ -102,7 +103,7 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
   # Pick style from type
   elif entry.typ != etNormal and entry.typ != etRegularFile:
     # result = if lsc.types.hasKey(entry.typ): lsc.types[entry.typ] else: defaultStyle()
-    return lsc.types.getOrDefault(entry.typ, ansiDefaultForeground)
+    return lsc.types.getOrDefault(entry.typ, ansiResetCode)
 
   # Pick style from path
   else:
@@ -111,8 +112,8 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
       for pattern, style in lsc.patterns.pairs:
         if entry.path == pattern:
           return style
-  
-  result = ansiDefaultForeground
+
+  result = ansiResetCode
 
 proc styleForPath*(lsc: LSColors, found: Found): string {.inline.} =
   styleForDirEntry(lsc, Entry(path: found.path.string, typ: found.pathEntryType()))
