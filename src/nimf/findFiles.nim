@@ -182,7 +182,7 @@ var numPrinted = 0 # If there's a low number of matches printing directly can be
 proc uwriteBuffer(f: syncio.File, buffer: pointer, len: Natural): int {.tags: [WriteIOEffect].} =
   ## Unlocked libc `fwrite` using glibc extension `fwrite_unlocked` (if available.)
   {.emit: """
-    #ifdef __GLIBC__
+    #ifdef __GLIBC__ && ((__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 19))
     inline size_t uwrite(const void* src, size_t size, size_t n, FILE* f) {
       return fwrite_unlocked(src, size, n, f);
     }
