@@ -179,9 +179,33 @@ var numPrinted = 0 # If there's a low number of matches printing directly can be
 
 {.push inline.}
 
+proc uwriteBuffer(f: syncio.File, buffer: pointer, len: Natural): int {.tags: [WriteIOEffect].} =
+  ## Unlocked libc `fwrite` using glibc extension `fwrite_unlocked` (if available.)
+  {.emit: """
+    #ifdef __GLIBC__
+    inline size_t uwrite(const void* src, size_t size, size_t n, FILE* f) {
+      return fwrite_unlocked(src, size, n, f);
+    }
+    #else
+    inline size_t uwrite(const void* src, size_t size, size_t n, FILE* f) {
+      return fwrite(src, size, n, f);
+    }
+    #endif
+  """ .} ## C function that checks for glibc and defines uwrite appropriately
+  proc c_uwrite(src: pointer, size, n: csize_t, f: syncio.File): csize_t {.
+    importc: "uwrite", header: "<stdio.h>".}
+  result = c_uwrite(buffer, 1, len.csize_t, f).int
+
+proc uwrite(f: syncio.File, s: string) =
+  when defined(windows):
+    syncio.write(f, s)
+  else:
+    if unlikely uwriteBuffer(f, cstring(s), s.len) != s.len:
+      raise newException(IOError, "cannot write string to file")
+
 proc writePrintQueue() =
-  stdout.write printQueue; stdout.flushFile()
-  printQueue.setLen 0
+  stdout.uwrite printQueue; stdout.flushFile()
+  reset printQueue
   numFailed = 0
 
 func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
@@ -310,6 +334,6 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
 
   case behavior.kind
   of plainPrint, coloredPrint:
-    if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
+    if printQueue.len > 0: stdout.uwrite printQueue; stdout.flushFile()
   of collect: result &= findings.found.paths
   else: discard

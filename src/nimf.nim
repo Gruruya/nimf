@@ -95,6 +95,7 @@ proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newS
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(runOption(kind: exec, cmds: cmds))
 
+
 #[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   ## For `--flag=auto`, `contra` is equivalent to `--flag` without an argument (negating)
@@ -191,6 +192,7 @@ func argHelp*(dfl: set[PathComponent], a: var ArgcvtParams): seq[string]=
     for d in dfl: dflSeq.add($d)
   argAggHelp(dflSeq, "set", typ, df)
   result = @[ a.argKeys, typ, df ]
+
 
 proc f*() =
   const nimbleFile = staticRead(currentSourcePath().parentDir.parentDir / "nimf.nimble")
