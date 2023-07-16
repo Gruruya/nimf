@@ -32,3 +32,4 @@ func encodeHyperlink*(s: string): string =
     else:
       result.add '%'
       result.add toHex(c)
+
