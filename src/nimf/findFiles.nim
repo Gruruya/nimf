@@ -217,7 +217,7 @@ proc notFoundPrint() =
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption; depth: Positive) {.gcsafe.} =
   let absolute = isAbsolute(dir)
   for descendent in dir.string.walkDirStat(relative = not absolute):
     template format(path: Path): Path =
@@ -249,7 +249,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if followSymlinks:
         let absPath = path.absolute
         if findings.seenOrIncl absPath: continue
-      m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior)
+      if behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth:
+        m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior, depth + 1)
       if pcDir in kinds:
         match(path)
 
@@ -260,8 +261,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       var absResolved = absolute(resolved)
       if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
-      if not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior)
+      if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
+        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior, depth + 1)
 
       if pcLinkToDir in kinds:
         match(path)
@@ -280,7 +281,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior)
+        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior, 1)
 
       elif info.kind in kinds:
         let found = path.findPath(patterns)

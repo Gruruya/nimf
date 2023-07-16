@@ -35,7 +35,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); depth = 0; followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -85,15 +85,15 @@ proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newS
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(runOption.init(coloredPrint, null, hyperlink))
+      discard traverse(runOption.init(coloredPrint, null, hyperlink, depth))
     else:
-      discard traverse(runOption.init(plainPrint, null, hyperlink))
+      discard traverse(runOption.init(plainPrint, null, hyperlink, depth))
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(runOption(kind: collect)))
+      run(execute, traverse(runOption(kind: collect, maxDepth: depth)))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(runOption(kind: exec, cmds: cmds))
+      discard traverse(runOption(kind: exec, cmds: cmds, maxDepth: depth))
 
 
 #[ Special argument parsing ]#
