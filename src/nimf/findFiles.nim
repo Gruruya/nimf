@@ -108,11 +108,11 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
 
   for i in countdown(patterns.high, patterns.low):
     if last < 0: return @[]
-    let pattern = patterns[i]
-    if pattern.len == 0:
+    if patterns[i].len == 0:
       result[i] = (0, 0)
     else:
-      let found = rfind(path, pattern, start = if i > filenameSep: lastSep else: 0, last, sensitive)
+      template start: untyped = (if i > filenameSep: max(patterns[i].high, lastSep) else: patterns[i].high)
+      let found = rfind(path, patterns[i], start, last, sensitive)
       if found.isNone: return @[]
       result[i] = found.unsafeGet
       last = result[i][0] - 1
