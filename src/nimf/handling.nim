@@ -77,14 +77,6 @@ func init*(T: type Command; line: string): T =
 template add(x: var string, y: varargs[string]) =
   for j in y: system.add(x, j)
 
-template getIt*[T, R](self: Option[T], callback: untyped; otherwise: R): R =
-  let tmp = self
-  if tmp.isSome:
-    template it: untyped {.inject.} = tmp.unsafeGet
-    callback
-  else:
-    otherwise
-
 proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
   let parentSep = path.rfind("/", last = path.high - 1).getIt(it.int, -1)

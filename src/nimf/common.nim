@@ -2,7 +2,7 @@
 # Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-import std/[paths, os, posix]
+import std/[paths, os, posix, options]
 
 type
   Found* = object
@@ -32,4 +32,12 @@ func encodeHyperlink*(s: string): string =
     else:
       result.add '%'
       result.add toHex(c)
+
+template getIt*[T, R](self: Option[T], callback: untyped; otherwise: R): R =
+  let tmp = self
+  if tmp.isSome:
+    template it: untyped {.inject.} = tmp.unsafeGet
+    callback
+  else:
+    otherwise
 
