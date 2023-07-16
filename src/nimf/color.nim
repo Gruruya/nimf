@@ -6,9 +6,8 @@
 import ./common, pkg/lscolors/entrytypes,
        std/[posix, os, tables, options], adix/lptabz
 import pkg/lscolors except parseLsColors, LsColors
-from   std/terminal import ansiResetCode
 from   std/strutils import split
-export entrytypes, ansiResetCode
+export entrytypes
 
 type
   LSColors* = object
@@ -21,6 +20,11 @@ type
     ## Basically a string pair
     pattern*: string
     color*: string
+
+template ansiCode*(s: string): string =
+  "\e[" & s & 'm'
+
+const ansiDefaultForeground* = ansiCode("00;39")
 
 proc rawParse(str: string): seq[RawRule] =
   for rule in str.split(':'):
@@ -44,7 +48,7 @@ proc parseLSColors*(str: string): LSColors =
 
   let raw = rawParse(str)
   for rule in raw:
-    template code: untyped = "\e[" & rule.color & 'm'
+    template code: untyped = ansiCode(rule.color)
     if rule.pattern == "ln" and rule.color == "target":
       result.lnTarget = true
     else:
@@ -98,7 +102,7 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
   # Pick style from type
   elif entry.typ != etNormal and entry.typ != etRegularFile:
     # result = if lsc.types.hasKey(entry.typ): lsc.types[entry.typ] else: defaultStyle()
-    return lsc.types.getOrDefault(entry.typ, ansiResetCode)
+    return lsc.types.getOrDefault(entry.typ, ansiDefaultForeground)
 
   # Pick style from path
   else:
@@ -107,7 +111,8 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
       for pattern, style in lsc.patterns.pairs:
         if entry.path == pattern:
           return style
-  result = ansiResetCode
+  
+  result = ansiDefaultForeground
 
 proc styleForPath*(lsc: LSColors, found: Found): string {.inline.} =
   styleForDirEntry(lsc, Entry(path: found.path.string, typ: found.pathEntryType()))
