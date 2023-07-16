@@ -4,8 +4,7 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-
-import ./[common, find, handling], std/[os, paths, locks, posix], pkg/malebolgia, pkg/adix/[lptabz, althash]
+import ./[common, find, handling], std/[os, paths, locks, posix, sets, hashes], pkg/malebolgia
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -22,7 +21,7 @@ type
     else: discard
   Findings = object
     found*: tuple[paths: seq[Found], lock: Lock]
-    dirs*: tuple[paths: LpSetz[Path, int8, 6], lock: Lock]
+    dirs*: tuple[paths: HashSet[Path], lock: Lock]
 
 proc toFound(file: File, path: Path, matches: seq[(int, int)]): Found =
   result = Found(path: path, matches: matches, kind: file.kind)
@@ -34,7 +33,7 @@ proc toFound(file: File, path: Path, matches: seq[(int, int)]): Found =
   else: discard
 
 proc init(T: typedesc[Findings]): T =
-  result.dirs.paths = initLpSetz[Path, int8, 6]()
+  result.dirs.paths = initHashset[Path]()
   initLock(result.found.lock)
   initLock(result.dirs.lock)
 
