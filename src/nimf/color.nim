@@ -3,11 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 ## Color support for the CLI, parsed from `LS_COLORS`
-import pkg/lscolors/entrytypes,
-       ./[common, find],
-       std/[options, posix, os, tables], adix/lptabz
+import ./common, pkg/lscolors/entrytypes,
+       std/[posix, os, tables, options], adix/lptabz
 import pkg/lscolors except parseLsColors, LsColors
-import std/terminal except Style
+from   std/terminal import ansiResetCode
 from   std/strutils import split
 export entrytypes, ansiResetCode
 
