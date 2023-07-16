@@ -35,7 +35,7 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); depth = 0; followSymlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); max_depth = 0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -76,7 +76,7 @@ proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newS
   if paths.len == 0: paths = @[Path(".")]
 
   template traverse(andDo: runOption): untyped =
-    traverseFind(paths, patterns, types, followSymlinks, andDo)
+    traverseFind(paths, patterns, types, follow_symlinks, andDo)
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
@@ -85,15 +85,15 @@ proc cliFind*(types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newS
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(runOption.init(coloredPrint, null, hyperlink, depth))
+      discard traverse(runOption.init(coloredPrint, null, hyperlink, max_depth))
     else:
-      discard traverse(runOption.init(plainPrint, null, hyperlink, depth))
+      discard traverse(runOption.init(plainPrint, null, hyperlink, max_depth))
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(runOption(kind: collect, maxDepth: depth)))
+      run(execute, traverse(runOption(kind: collect, maxDepth: max_depth)))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(runOption(kind: exec, cmds: cmds, maxDepth: depth))
+      discard traverse(runOption(kind: exec, cmds: cmds, maxDepth: max_depth))
 
 
 #[ Special argument parsing ]#
@@ -205,7 +205,7 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"followSymlinks": 'L', "null": '0', "types": 't'},
+           short = {"types": 't', "max_depth": 'd', "followSymlinks": 'L', "null": '0'},
            help = {"types": "Select which file kind(s) to match. File kinds include any|file|directory|link.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
