@@ -4,7 +4,7 @@
 
 ## Color support for the CLI, parsed from `LS_COLORS`
 import ./common, pkg/lscolors/entrytypes,
-       std/[posix, os, tables, options], adix/lptabz
+       std/[posix, os, options, tables]
 import pkg/lscolors except parseLsColors, LsColors
 from   std/strutils import split
 export entrytypes
@@ -13,19 +13,24 @@ type
   LSColors* = object
     ## Holds parsed LS_COLORS
     types*: TableRef[EntryType, string]
-    patterns*: LPTabz[string, string, int8, 6]
-    extensions*: LPTabz[string, string, int8, 6]
+    patterns*: TableRef[string, string]
+    extensions*: TableRef[string, string]
     lnTarget*: bool
   RawRule = object
     ## Basically a string pair
     pattern*: string
     color*: string
 
+func init*(T: type LSColors): LSColors =
+  result.types = newTable[EntryType, string]()
+  result.patterns = newTable[string, string]()
+  result.extensions = newTable[string, string]()
+
+const ansiResetCode* = "\e[0m"
+const ansiDefaultForeground* = "\e[00m"
+
 template ansiCode*(s: string): string =
   "\e[" & s & 'm'
-
-const ansiResetCode* = ansiCode("0")
-const ansiDefaultForeground* = ansiCode("00;39")
 
 proc rawParse(str: string): seq[RawRule] =
   for rule in str.split(':'):
@@ -42,11 +47,7 @@ proc getExtension*(path: string): string {.inline.} =
 
 proc parseLSColors*(str: string): LSColors =
   ## Parse a LS_COLORS string
-  # result.types = initLPTabz[EntryType, string, int8, 6]()
-  result.types = newTable[EntryType, string]()
-  result.patterns = initLPTabz[string, string, int8, 6]()
-  result.extensions = initLPTabz[string, string, int8, 6]()
-
+  result = LSColors.init()
   let raw = rawParse(str)
   for rule in raw:
     template code: untyped = ansiCode(rule.color)
@@ -98,12 +99,12 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
   # Special case: inherit style from target
   if entry.typ == etSymbolicLink and lsc.lnTarget:
     let target = entry.path.expandSymlink
-    return styleForDirEntry(lsc, Entry(path: target, typ: target.pathEntryType()))
+    styleForDirEntry(lsc, Entry(path: target, typ: target.pathEntryType()))
 
   # Pick style from type
   elif entry.typ != etNormal and entry.typ != etRegularFile:
     # result = if lsc.types.hasKey(entry.typ): lsc.types[entry.typ] else: defaultStyle()
-    return lsc.types.getOrDefault(entry.typ, ansiResetCode)
+    lsc.types.getOrDefault(entry.typ, ansiResetCode)
 
   # Pick style from path
   else:
@@ -112,8 +113,7 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
       for pattern, style in lsc.patterns.pairs:
         if entry.path == pattern:
           return style
-
-  result = ansiResetCode
+    lsc.types.getOrDefault(entry.typ, ansiResetCode)
 
 proc styleForPath*(lsc: LSColors, found: Found): string {.inline.} =
   styleForDirEntry(lsc, Entry(path: found.path.string, typ: found.pathEntryType()))
