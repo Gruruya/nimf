@@ -120,7 +120,7 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
       last = result[i][0] - 1
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
-  # `walkDir` which yields an object containing the `Stat` if the path was a file
+  # `walkDir` which yields an object containing the `Stat` if the path was a link
   var d = opendir(dir)
   if d == nil:
     if checkDir:
@@ -190,7 +190,7 @@ func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): stri
   result.add display
   result.add "\e]8;;\e\\"
 
-proc print(path: Path; behavior: runOption; display = path.string) =
+proc print(path: Path; behavior: RunOption; display = path.string) =
   template line: string =
     (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, display)
      else: display) & (if behavior.null: '\0' else: '\n')
@@ -224,7 +224,7 @@ proc notFoundPrint() =
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption; depth: Positive) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: RunOption; depth: Positive) {.gcsafe.} =
   template loop: untyped =
     template format(path: string): Path =
       if absolute or dir.string in [".", "./"]: Path(path)
@@ -291,7 +291,7 @@ func stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
   else: p
 
-proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: runOption): seq[Found] =
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: RunOption): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:

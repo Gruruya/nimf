@@ -26,13 +26,13 @@ type
     allIndexes*: seq[seq[Natural]]
     placements*: seq[(Natural, Natural)]
 
-  runOptionKind* = enum
+  RunOptionKind* = enum
     plainPrint, coloredPrint, collect, exec
 
-  runOption* = object
+  RunOption* = object
     maxDepth* = 0
     searchAll*: bool
-    case kind*: runOptionKind
+    case kind*: RunOptionKind
     of plainPrint, coloredPrint:
       null*: bool
       case hyperlink*: bool
@@ -44,14 +44,14 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type runOption; kind: runOptionKind; null: bool; hyperlink: bool; depth: int; all: bool): T =
+proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; depth: int; all: bool): T =
   assert kind in {plainPrint, coloredPrint}
   {.cast(uncheckedAssign).}:
     if hyperlink:
-      runOption(kind: kind, null: null, maxDepth: depth, searchAll: all, hyperlink: true,
+      RunOption(kind: kind, null: null, maxDepth: depth, searchAll: all, hyperlink: true,
                 hyperlinkPrefix: "\e]8;;file://" & encodeHyperlink(getHostname()),
                 cwd: encodeHyperlink(os.getCurrentDir()) & '/')
-    else: runOption(kind: kind, null: null, maxDepth: depth, searchAll: all, hyperlink: false)
+    else: RunOption(kind: kind, null: null, maxDepth: depth, searchAll: all, hyperlink: false)
 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()

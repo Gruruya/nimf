@@ -75,7 +75,7 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
-  template traverse(andDo: runOption): untyped =
+  template traverse(andDo: RunOption): untyped =
     traverseFind(paths, patterns, types, follow_symlinks, andDo)
 
   if execute.len == 0:
@@ -85,15 +85,15 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(runOption.init(coloredPrint, null, hyperlink, max_depth, all))
+      discard traverse(RunOption.init(coloredPrint, null, hyperlink, max_depth, all))
     else:
-      discard traverse(runOption.init(plainPrint, null, hyperlink, max_depth, all))
+      discard traverse(RunOption.init(plainPrint, null, hyperlink, max_depth, all))
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(runOption(kind: collect, maxDepth: max_depth, searchAll: all)))
+      run(execute, traverse(RunOption(kind: collect, maxDepth: max_depth, searchAll: all)))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(runOption(kind: exec, cmds: cmds, maxDepth: max_depth, searchAll: all))
+      discard traverse(RunOption(kind: exec, cmds: cmds, maxDepth: max_depth, searchAll: all))
 
 
 #[ Special argument parsing ]#
