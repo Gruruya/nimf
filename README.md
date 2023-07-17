@@ -69,7 +69,7 @@ Benchmarks
 | fd[^1] | 25.16s     | 11.32s            | N/A       |
 
 [^1]: These measurements may be innaccurate, `fd` would not stop searching my drive (and pinning my CPU) so I had to watch for when it stopped printing results and SIGQUIT.  
-As the **3 matches** search finished printing its results much earlier than it finished searching, I could not measure it. But for brevity, `find` (when lucky) finished printing the 3 results in around 1.5s. With this same measuring, `f` finishes in around 0.35s and `find` around 0.7s.
+As the **3 matches** search finished printing its results much earlier than it finished searching, I could not measure it. But for brevity, `fd` (when lucky) finished printing the 3 results in around 1.5s. With this same measuring, `f` finishes in around 0.35s and `find` around 0.7s.
 
 ---
 [![GitHub CI](../../actions/workflows/build.yml/badge.svg?branch=master)](../../actions/workflows/build.yml)
