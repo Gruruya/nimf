@@ -165,7 +165,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
             of DT_UNKNOWN:
               kSetGeneric()
             else: # DT_REG or special "files" like FIFOs
-              discard
+              if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
           else:  # assuming that field `d_type` is not present
             kSetGeneric()
 
