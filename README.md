@@ -24,6 +24,7 @@ Options:
   -h, --help                                   print this cligen-erated help
   --help-syntax                                advanced: prepend,plurals,..
   --version              bool           false  print version
+  -a, --all              bool           false  Search all directories, normally a few choice directories are skipped.
   -t=, --types=          set(filetype)  any    Select which file kind(s) to match. File kinds include any|file|directory|link.
   -e=, --execute=        strings        {}     Execute a command for each matching search result in parallel.
                                                Alternatively, end this argument with "+" to execute the command once with all results as arguments.
@@ -48,23 +49,23 @@ Benchmarks
 #### 375,000 file directory:
 |              | No pattern | 231,970 matches |
 |--------------|------------|-----------------|
-| f -c=never   | 0.95s      | 0.55s           |
+| f -ac=never  | 0.95s      | 0.55s           |
 | fd -uc=never | 1.10s      | 0.73s           |
-| f            | 1.17s      | 0.84s           |
+| f -a         | 1.17s      | 0.84s           |
 | find         | 1.23s      | 0.96s           |
 | fd -u        | 1.29s      | 0.96s           |
 
 #### 1.75m file directory:
 |       | No pattern | 1,028,205 matches | 14,075 matches |
 |-------|------------|-------------------|----------------|
-| f     | 6.91s      | 4.16s             | 0.38s          |
+| f -a  | 6.91s      | 4.16s             | 0.38s          |
 | find  | 7.30s      | 4.83s             | 1.25s          |
 | fd -u | 9.62s      | 4.92s             | 0.96s          |
 
 #### 4m file directory (my root dir):
 |        | No pattern | 2,241,660 matches | 3 matches |
 |--------|------------|-------------------|-----------|
-| f      | 13.59s     | 9.54s             | 0.65s     |
+| f -a   | 13.59s     | 9.54s             | 0.65s     |
 | find   | 15.32s     | 10.88s            | 2.68s     |
 | fd[^1] | 25.16s     | 11.32s            | N/A       |
 

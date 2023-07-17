@@ -206,7 +206,8 @@ proc f*() =
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
            short = {"types": 't', "max_depth": 'd', "followSymlinks": 'L', "null": '0'},
-           help = {"types": "Select which file kind(s) to match. File kinds include any|file|directory|link.",
+           help = {"all": "Search all directories, normally a few choice directories are skipped.",
+                   "types": "Select which file kind(s) to match. File kinds include any|file|directory|link.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
