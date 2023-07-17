@@ -295,26 +295,28 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          template statFound: Found =
-            case info.kind
-            of pcFile:
-              var s: Stat
-              if lstat(cstring path.string, s) < 0'i32: continue
-              Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
-            of pcLinkToFile:
-              var s: Stat
-              let broken = stat(cstring path.string, s) < 0'i32
-              Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
-            else:
-              Found(path: path.stripDot, kind: info.kind, matches: found)
+          template getFound: Found =
+            if behavior.kind == coloredPrint:
+              case info.kind
+              of pcFile:
+                var s: Stat
+                if lstat(cstring path.string, s) < 0'i32: continue
+                Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
+              of pcLinkToFile:
+                var s: Stat
+                let broken = stat(cstring path.string, s) < 0'i32
+                Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
+              else:
+                Found(path: path.stripDot, kind: info.kind, matches: found)
+            else: Found(path: path.stripDot, kind: info.kind, matches: found)
 
           case behavior.kind
           of plainPrint:
             print(path, behavior)
           of coloredPrint:
-            print(path, behavior, color(statFound(), patterns))
-          of collect: findings.add statFound()
-          of exec: run(m.getHandle, behavior.cmds, statFound())
+            print(path, behavior, color(getFound(), patterns))
+          of collect: findings.add getFound()
+          of exec: run(m.getHandle, behavior.cmds, getFound())
         elif behavior.kind in {plainPrint, coloredPrint}:
           notFoundPrint()
 
