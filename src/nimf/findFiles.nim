@@ -177,6 +177,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
 var printQueue = newStringOfCap(8192)
 var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
+var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 
 {.push inline.}
 
@@ -195,16 +196,20 @@ proc print(path: Path; behavior: runOption; display = path.string) =
      else: display) & (if behavior.null: '\0' else: '\n')
 
   {.gcsafe.}:
-    acquire(printLock)
-    if printQueue.len + line.len > 8192:
-      let output = move(printQueue)
-      release(printLock)
-      stdout.write output & line
-      stdout.flushFile()
-      numFailed = 0
+    if numPrinted < 8192:
+      stdout.write line(); stdout.flushFile()
+      inc numPrinted
     else:
-      printQueue.add line
-      release(printLock)
+      acquire(printLock)
+      if printQueue.len + line.len > 8192:
+        let output = move(printQueue)
+        release(printLock)
+        stdout.write output & line
+        stdout.flushFile()
+        numFailed = 0
+      else:
+        printQueue.add line
+        release(printLock)
 
 proc notFoundPrint() =
   {.gcsafe.}:
