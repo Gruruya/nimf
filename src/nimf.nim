@@ -129,8 +129,8 @@ type FileKind = enum
 
 func to(filetype: FileKind, T: type set[PathComponent]): T =
   case filetype
-  of file: {pcFile}
-  of directory: {pcDir}
+  of file: {pcFile, pcLinkToFile}
+  of directory: {pcDir, pcLinkToDir}
   of link: {pcLinkToFile, pcLinkToDir}
   of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
 
