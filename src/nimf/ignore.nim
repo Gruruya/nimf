@@ -6,7 +6,7 @@ import std/sets
 
 const ignoreDirSet* = toHashSet([
   ".git",
-  ".cache", "__pycache__",
+  ".cache", "nimcache", "__pycache__",
   "venv", "node_modules"])
 
 func ignoreDir*(s: string): bool {.inline.} =
