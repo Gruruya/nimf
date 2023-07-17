@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # nimf
 
-`find`-like, quickly search for files in a directory hierarchy.
+`find`-like, search for files in a directory hierarchy.
 
 Features:
 * Multithreaded and efficient ([faster than](#benchmarks) `find` and `fd`)
