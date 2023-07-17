@@ -10,7 +10,7 @@ type
     matches*: seq[(int, int)]
     case kind*: PathComponent
     of pcFile:
-      stat*: Stat
+      stat*: Option[Stat]
     of pcLinkToFile:
       broken*: bool
     else: discard

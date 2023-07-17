@@ -15,7 +15,7 @@ type
     path*: string
     case kind*: PathComponent
     of pcFile:
-      stat*: Stat
+      stat*: Option[Stat]
     of pcLinkToFile:
       broken*: bool
     else: discard
@@ -152,10 +152,10 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
           getSymlinkFileKind(path)
 
         template kSetGeneric() = # pure Posix component `k` resolution
-          if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
-          elif S_ISDIR(result.stat.st_mode):
+          if lstat(path.cstring, result.stat.get) < 0'i32: continue  # don't yield
+          elif S_ISDIR(result.stat.unsafeGet.st_mode):
             result.kind = pcDir
-          elif S_ISLNK(result.stat.st_mode):
+          elif S_ISLNK(result.stat.unsafeGet.st_mode):
             resolveSymlink()
 
         {.cast(uncheckedAssign).}: # Assigning `result.kind`
@@ -168,7 +168,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
             of DT_UNKNOWN:
               kSetGeneric()
             else: # DT_REG or special "files" like FIFOs
-              if lstat(path.cstring, result.stat) < 0'i32: continue  # don't yield
+              discard
           else:  # assuming that field `d_type` is not present
             kSetGeneric()
 
@@ -301,7 +301,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
               of pcFile:
                 var s: Stat
                 if lstat(cstring path.string, s) < 0'i32: continue
-                Found(path: path.stripDot, kind: pcFile, matches: found, stat: s)
+                Found(path: path.stripDot, kind: pcFile, matches: found, stat: some s)
               of pcLinkToFile:
                 var s: Stat
                 let broken = stat(cstring path.string, s) < 0'i32

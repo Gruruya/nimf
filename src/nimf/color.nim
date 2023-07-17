@@ -79,18 +79,24 @@ proc pathEntryType*(found: Found): EntryType =
     if found.broken: etOrphanedSymbolicLink
     else: etSymbolicLink
   else:
-    if S_ISBLK(found.stat.st_mode): etBlockDevice
-    elif S_ISCHR(found.stat.st_mode): etCharacterDevice
-    elif S_ISFIFO(found.stat.st_mode): etFIFO
-    elif S_ISSOCK(found.stat.st_mode): etSocket
-    elif (found.stat.st_mode.cint and S_ISUID) != 0'i32: etSetuid
-    elif (found.stat.st_mode.cint and S_ISGID) != 0'i32: etSetgid
-    elif (found.stat.st_mode.cint and S_ISVTX) != 0'i32: etSticky
-    elif S_ISREG(found.stat.st_mode):
+    let mode =
+      if found.stat.isNone:
+        var stat : Stat
+        discard lstat(found.path.cstring, stat)
+        stat.st_mode
+      else: found.stat.unsafeGet.st_mode
+    if S_ISBLK(mode): etBlockDevice
+    elif S_ISCHR(mode): etCharacterDevice
+    elif S_ISFIFO(mode): etFIFO
+    elif S_ISSOCK(mode): etSocket
+    elif (mode.cint and S_ISUID) != 0'i32: etSetuid
+    elif (mode.cint and S_ISGID) != 0'i32: etSetgid
+    elif (mode.cint and S_ISVTX) != 0'i32: etSticky
+    elif S_ISREG(mode):
       # Check if this file is executable
-      if (found.stat.st_mode.cint and S_IXUSR) != 0'i32 or
-         (found.stat.st_mode.cint and S_IXGRP) != 0'i32 or
-         (found.stat.st_mode.cint and S_IXOTH) != 0'i32: etExecutableFile
+      if (mode.cint and S_IXUSR) != 0'i32 or
+         (mode.cint and S_IXGRP) != 0'i32 or
+         (mode.cint and S_IXOTH) != 0'i32: etExecutableFile
       else: etRegularFile
     else: etNormal
 
