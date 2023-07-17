@@ -7,8 +7,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 `find`-like, quickly search for files in a directory hierarchy.
 
-Highlights:
-* Multithreaded and efficient
+Features:
+* Multithreaded and efficient ([faster than]((#benchmarks)) `find` and `fd`)
 * Mostly intuitive, and simple interface
 
 Usage
@@ -42,6 +42,34 @@ Options:
   -c, --color            flag           auto   Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.
   --hyperlink            flag           false  Enable clickable hyperlinks in supported terminals.
 ```
+
+Benchmarks
+---
+#### 375,000 file directory:
+|              | No pattern | 231,970 matches |
+|--------------|------------|-----------------|
+| f -c=never   | 0.95s      | 0.55s           |
+| fd -uc=never | 1.10s      | 0.73s           |
+| f            | 1.17s      | 0.84s           |
+| find         | 1.23s      | 0.96s           |
+| fd -u        | 1.29s      | 0.96s           |
+
+#### 1.75m file directory:
+|       | No pattern | 1,028,205 matches | 14,075 matches |
+|-------|------------|-------------------|----------------|
+| f     | 6.91s      | 4.16s             | 0.38s          |
+| find  | 7.30s      | 4.83s             | 1.25s          |
+| fd -u | 9.62s      | 4.92s             | 0.96s          |
+
+#### 4m file directory (my root dir):
+|        | No pattern | 2,241,660 matches | 3 matches |
+|--------|------------|-------------------|-----------|
+| f      | 13.59s     | 9.54s             | 0.65s     |
+| find   | 15.32s     | 10.88s            | 2.68s     |
+| fd[^1] | 25.16s     | 11.32s            | N/A       |
+
+[^1]: These measurements may be innaccurate, `fd` would not stop searching my drive (and pinning my CPU) so I had to watch for when it stopped printing results and SIGQUIT.  
+As the **3 matches** search finished printing its results much earlier than it finished searching, I could not measure it. But for brevity, `find` (when lucky) finished printing the 3 results in around 1.5s. With this same measuring, `f` finishes in around 0.35s and `find` around 0.7s.
 
 ---
 [![GitHub CI](../../actions/workflows/build.yml/badge.svg?branch=master)](../../actions/workflows/build.yml)
