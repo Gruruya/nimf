@@ -4,7 +4,7 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-import ./[common, find, handling], std/[os, paths, locks, posix, sets, hashes], pkg/malebolgia
+import ./[common, find, handling, ignore], std/[os, paths, locks, posix, sets, hashes], pkg/malebolgia
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -246,6 +246,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         notFoundPrint()
 
     if descendent.kind == pcDir:
+      if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path) & '/'
       if followSymlinks:
         let absPath = path.absolute
@@ -256,6 +257,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         match(path)
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
+      if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path)
       var resolved = Path(expandSymlink(path.string))
       if resolved == Path("/"): continue # Special case this
