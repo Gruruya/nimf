@@ -180,7 +180,7 @@ var numPrinted = 0 # If there's a low number of matches printing directly can be
 
 proc writePrintQueue() =
   stdout.write printQueue; stdout.flushFile()
-  reset printQueue
+  printQueue.setLen 0
   numFailed = 0
 
 func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
