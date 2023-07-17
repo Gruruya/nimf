@@ -181,11 +181,6 @@ var numPrinted = 0 # If there's a low number of matches printing directly can be
 
 {.push inline.}
 
-proc writePrintQueue() =
-  stdout.write printQueue; stdout.flushFile()
-  printQueue.setLen 0
-  numFailed = 0
-
 func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
   result = prefix
   if not path.isAbsolute:
@@ -196,18 +191,21 @@ func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): stri
   result.add "\e]8;;\e\\"
 
 proc print(path: Path; behavior: runOption; display = path.string) =
-  template output: string =
+  template line: string =
     (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, display)
      else: display) & (if behavior.null: '\0' else: '\n')
 
-  if numPrinted < 8192:
-    stdout.write output(); stdout.flushFile()
-    inc numPrinted
-  else:
-    withLock(printLock):
-      printQueue.add output()
-      if printQueue.len >= 8192:
-        writePrintQueue()
+  {.gcsafe.}:
+    acquire(printLock)
+    if printQueue.len + line.len > 8192:
+      let output = move(printQueue)
+      release(printLock)
+      stdout.write output & line
+      stdout.flushFile()
+      numFailed = 0
+    else:
+      printQueue.add line
+      release(printLock)
 
 proc notFoundPrint() =
   {.gcsafe.}:
@@ -215,7 +213,10 @@ proc notFoundPrint() =
       inc numFailed
       if numFailed > 16384:
         withLock(printLock):
-          writePrintQueue()
+          stdout.write printQueue
+          printQueue.setLen 0
+        stdout.flushFile()
+        numFailed = 0
 
 {.pop inline.}
 
