@@ -12,7 +12,7 @@ proc hash(x: Path): Hash {.inline, borrow.}
 
 type
   File = object
-    path*: Path
+    path*: string
     case kind*: PathComponent
     of pcFile:
       stat*: Stat
@@ -31,6 +31,9 @@ proc toFound(file: File, path: Path, matches: seq[(int, int)]): Found =
   of pcLinkToFile:
     result.broken = file.broken
   else: discard
+
+proc toFound(file: tuple[kind: PathComponent, path: string], path: Path, matches: seq[(int, int)]): Found =
+  Found(path: path, matches: matches, kind: file.kind)
 
 proc init(T: typedesc[Findings]): T =
   result.dirs.paths = initHashset[Path]()
@@ -128,15 +131,15 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
       var x = readdir(d)
       if x == nil: break
       var result = File(kind: pcFile)
-      result.path = Path($cast[cstring](addr x.d_name))
-      if result.path notin [Path ".", Path ".."]:
-        let path = Path(dir) / result.path
+      result.path = $cast[cstring](addr x.d_name)
+      if result.path notin [".", ".."]:
+        let path = dir / result.path.string
         if not relative:
           result.path = path
 
-        template getSymlinkFileKind(path: Path) =
+        template getSymlinkFileKind(path: string) =
           var s: Stat
-          assert(path != Path "")
+          assert(path != "")
           if stat(path.cstring, s) == 0'i32:
             if S_ISDIR(s.st_mode):
               result.kind = pcLinkToDir
@@ -217,17 +220,16 @@ proc notFoundPrint() =
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: runOption; depth: Positive) {.gcsafe.} =
-  let absolute = isAbsolute(dir)
-  for descendent in dir.string.walkDirStat(relative = not absolute):
-    template format(path: Path): Path =
-      if absolute or dir.string in [".", "./"]: path
-      else: dir / path
+  template loop: untyped =
+    template format(path: string): Path =
+      if absolute or dir.string in [".", "./"]: Path(path)
+      else: dir / Path(path)
 
     template absolute(path: Path): Path =
       if absolute: path
       else: absolutePath(path)
 
-    template wasFound(found: seq[(int, int)]) =
+    template wasFound(path: Path; found: seq[(int, int)]) =
       case behavior.kind
       of plainPrint:
         print(path, behavior)
@@ -239,7 +241,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     template match(path: Path) =
       let found = path.findPath(patterns)
       if found.len > 0:
-        wasFound(found)
+        wasFound(path, found)
       elif behavior.kind in {plainPrint, coloredPrint}:
         notFoundPrint()
 
@@ -269,6 +271,14 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     elif descendent.kind in kinds:
       let path = format(descendent.path)
       match(path)
+
+  let absolute = isAbsolute(dir)
+  if behavior.kind == coloredPrint:
+    for descendent in dir.string.walkDirStat(relative = not absolute):
+      loop()
+  else:
+    for descendent in dir.string.walkDir(relative = not absolute):
+      loop()
 
 func stripDot(p: Path): Path {.inline.} =
   if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
