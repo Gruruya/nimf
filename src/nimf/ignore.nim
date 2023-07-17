@@ -4,10 +4,7 @@
 
 import std/sets
 
-const ignoreDirSet* = toHashSet([
+const ignoredDirs* = toHashSet([
   ".git",
   ".cache", "nimcache", "__pycache__",
   "venv", "node_modules"])
-
-func ignoreDir*(s: string): bool {.inline.} =
-  s in ignoreDirSet
