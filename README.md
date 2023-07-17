@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 `find`-like, quickly search for files in a directory hierarchy.
 
 Features:
-* Multithreaded and efficient ([faster than]((#benchmarks)) `find` and `fd`)
+* Multithreaded and efficient ([faster than](#benchmarks) `find` and `fd`)
 * Mostly intuitive, and simple interface
 
 Usage
