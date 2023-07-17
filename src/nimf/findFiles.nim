@@ -133,7 +133,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
       var result = File(kind: pcFile)
       result.path = $cast[cstring](addr x.d_name)
       if result.path notin [".", ".."]:
-        let path = dir / result.path.string
+        let path = dir / result.path
         if not relative:
           result.path = path
 
@@ -177,7 +177,6 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
 var printQueue = newStringOfCap(8192)
 var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
-var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 
 {.push inline.}
 
