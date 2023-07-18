@@ -288,8 +288,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
 
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: sink RunOption): seq[Found] =
   let cwd = getCurrentDir()
-  if behavior.hyperlink:
-    {.cast(uncheckedAssign).}: behavior.hyperlinkCwd = encodeHyperlink(cwd.string) & '/'
+  if behavior.kind in {plainPrint, coloredPrint} and behavior.hyperlink:
+    behavior.hyperlinkCwd = encodeHyperlink(cwd.string) & '/'
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
