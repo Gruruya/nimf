@@ -8,6 +8,7 @@ license     = "AGPL-3.0-only"
 
 srcDir = "src"
 skipDirs = @["tests"]
+installExt = @["nim"]
 namedBin["nimf"] = "f"
 
 # Dependencies
