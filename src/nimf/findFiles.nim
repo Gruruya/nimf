@@ -267,9 +267,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       let path = format(descendent.path)
       var resolved = try: Path(expandSymlink(path.string)) except: continue
       if resolved == Path("/"): continue # Special case this
-      var absResolved = absolutePath(resolved, cwd)
-      if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
+      let absResolved = absolutePath(resolved, cwd)
       if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
         m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior, cwd, depth + 1)
 
