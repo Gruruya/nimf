@@ -211,7 +211,7 @@ proc f*() =
                     "\nOptions:\n$options",
            short = {"types": 't', "max_depth": 'd', "followSymlinks": 'L', "null": '0'},
            help = {"all": "Search all directories, normally a few choice directories are skipped.",
-                   "types": "Select which file kind(s) to match. File kinds include any|file|directory|link.",
+                   "types": "Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
@@ -223,7 +223,9 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
+                   "max-depth": "Set a maximum of how deep in the directory tree to search.",
                    "limit": "Limit the number of results.",
+                   "follow-symlinks": "Enable traversing symlinks.",
                    "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
                    "hyperlink": "Enable clickable hyperlinks in supported terminals."})
