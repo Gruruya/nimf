@@ -219,6 +219,7 @@ proc f*() =
                               "\"{/.}\": basename without file extension\n" &
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
+                   "limit": "Limit the number of results.",
                    "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
                    "hyperlink": "Enable clickable hyperlinks in supported terminals."})

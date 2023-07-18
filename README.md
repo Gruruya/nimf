@@ -38,6 +38,7 @@ Options:
                                                Example: f .jpg -e 'convert {} {.}.png'
                                                If no placeholder is present, an implicit " {}" at the end is assumed.
   -d=, --max-depth=      int            0      set max_depth
+  -l=, --limit=          int            0      Limit the number of results.
   -L, --follow-symlinks  bool           false  set follow_symlinks
   -0, --null             bool           false  Separate search results and split stdin with null characters `\0` instead of newlines `\n`.
   -c, --color            flag           auto   Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.
