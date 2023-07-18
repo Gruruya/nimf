@@ -76,7 +76,7 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
   if paths.len == 0: paths = @[Path(".")]
 
   template traverse(andDo: RunOption): untyped =
-    traverseFind(paths, patterns, types, follow_symlinks, andDo)
+    traverseFind(paths, patterns, types, andDo)
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
@@ -85,16 +85,15 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(RunOption.init(coloredPrint, null, hyperlink, all, max_depth, limit))
+      discard traverse(RunOption.init(coloredPrint, followSymlinks, all, max_depth, limit, null, hyperlink))
     else:
-      discard traverse(RunOption.init(plainPrint, null, hyperlink, all, max_depth, limit))
+      discard traverse(RunOption.init(plainPrint, followSymlinks, all, max_depth, limit, null, hyperlink))
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(RunOption(kind: collect, searchAll: all, maxDepth: max_depth, maxFound: limit)))
+      run(execute, traverse(RunOption.init(collect, followSymlinks, all, max_depth, limit)))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(RunOption(kind: exec, cmds: cmds, searchAll: all, maxDepth: max_depth, maxFound: limit))
-
+      discard traverse(RunOption.init(exec, followSymlinks, all, max_depth, limit, cmds))
 
 #[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =

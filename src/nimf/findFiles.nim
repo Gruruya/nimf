@@ -226,7 +226,7 @@ proc notFoundPrint() =
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: RunOption; cwd: Path; depth: Positive) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
   if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
@@ -254,23 +254,23 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     if descendent.kind == pcDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path) & '/'
-      if followSymlinks:
-        let absPath = absolutePath(path, cwd)
+      if behavior.followSymlinks:
+        let absPath = absolutePath(path, behavior.cwd)
         if findings.seenOrIncl absPath: continue
       if behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth:
-        m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior, cwd, depth + 1)
+        m.spawn findDirRec(m, path, patterns, kinds, behavior, depth + 1)
       if pcDir in kinds:
         match(path)
 
-    elif followSymlinks and descendent.kind == pcLinkToDir:
+    elif behavior.followSymlinks and descendent.kind == pcLinkToDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path)
       var resolved = try: dir / Path(expandSymlink(path.string)) except: continue
       if resolved == Path("/"): continue # Special case this
       if resolved.string[^1] != '/': resolved &= '/'
-      let absResolved = absolutePath(resolved, cwd)
+      let absResolved = absolutePath(resolved, behavior.cwd)
       if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior, cwd, depth + 1)
+        m.spawn findDirRec(m, resolved, patterns, kinds, behavior, depth + 1)
 
       if pcLinkToDir in kinds:
         match(path)
@@ -286,16 +286,13 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
       loop()
 
-proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: sink RunOption): seq[Found] =
-  let cwd = getCurrentDir()
-  if behavior.kind in {plainPrint, coloredPrint} and behavior.hyperlink:
-    behavior.hyperlinkCwd = encodeHyperlink(cwd.string) & '/'
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; behavior: sink RunOption): seq[Found] =
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior, cwd, 1)
+        m.spawn findDirRec(getHandle m, path, patterns, kinds, behavior, 1)
 
       elif info.kind in kinds:
         let found = path.findPath(patterns)

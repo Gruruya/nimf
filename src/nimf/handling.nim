@@ -33,6 +33,12 @@ type
     searchAll*: bool
     maxDepth* = 0
     maxFound* = 0
+
+    case followSymlinks*: bool
+    of true:
+      cwd*: Path
+    else: discard
+
     case kind*: RunOptionKind
     of plainPrint, coloredPrint:
       null*: bool
@@ -45,12 +51,25 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; searchAll: bool; maxDepth: int; maxFound: int): T =
+proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int): T {.inline.} =
+  result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
+  if followSymlinks:
+    result.cwd = paths.getCurrentDir()
+
+proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
+  assert kind == exec
+  result = RunOption.init(kind, followSymlinks, searchAll, maxDepth, maxFound)
+  result.cmds = cmds
+
+proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
   assert kind in {plainPrint, coloredPrint}
-  {.cast(uncheckedAssign).}:
-    result = RunOption(kind: kind, null: null, maxDepth: maxDepth, maxFound: maxFound, searchAll: searchAll, hyperlink: hyperlink)
-    if hyperlink:
-      result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
+  result = RunOption.init(kind, followSymlinks, searchAll, maxDepth, maxFound)
+  # {.cast(uncheckedAssign).}:
+  result.null = null
+  result.hyperlink = hyperlink
+  if hyperlink:
+    result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
+    result.hyperlinkCwd = encodeHyperlink(if followSymlinks: result.cwd.string else: os.getCurrentDir()) & '/'
 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()
