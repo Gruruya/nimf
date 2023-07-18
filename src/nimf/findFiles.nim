@@ -4,7 +4,8 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-import ./[common, find, handling, ignore], std/[os, paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
+import ./[common, find, handling, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
+import std/os except getCurrentDir
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -182,18 +183,18 @@ var numFound: Atomic[int]
 
 {.push inline.}
 
-func wrapHyperlink(path: Path, prefix, cwd: string, display = path.string): string =
+func wrapHyperlink(path: Path, prefix: string, cwd: Path, display = path.string): string =
   result = prefix
   if not path.isAbsolute:
-    result.add cwd
+    result.add cwd.string
   result.add encodeHyperlink(path.string)
   result.add "\e\\"
   result.add display
   result.add "\e]8;;\e\\"
 
-proc print(path: Path; behavior: RunOption; display = path.string) =
+proc print(path: Path; behavior: RunOption; cwd: Path; display = path.string) =
   template line: string =
-    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.cwd, display)
+    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, cwd, display)
      else: display) & (if behavior.null: '\0' else: '\n')
 
   {.gcsafe.}:
@@ -225,25 +226,21 @@ proc notFoundPrint() =
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: RunOption; depth: Positive) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: RunOption; cwd: Path; depth: Positive) {.gcsafe.} =
   if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
     template format(path: string): Path =
-      if absolute or dir.string in [".", "./"]: Path(path)
+      if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
       else: dir / Path(path)
-
-    template absolute(path: Path): Path =
-      if absolute: path
-      else: absolutePath(path)
 
     template wasFound(path: Path; found: seq[(int, int)]) =
       if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
       case behavior.kind
       of plainPrint:
-        print(path, behavior)
+        print(path, behavior, cwd)
       of coloredPrint:
-        print(path, behavior, ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)))
+        print(path, behavior, cwd, ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)))
       of collect: findings.add descendent.toFound(path, matches = found)
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
@@ -258,10 +255,10 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path) & '/'
       if followSymlinks:
-        let absPath = path.absolute
+        let absPath = absolutePath(path, cwd)
         if findings.seenOrIncl absPath: continue
       if behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth:
-        m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior, depth + 1)
+        m.spawn findDirRec(m, path, patterns, kinds, followSymlinks, behavior, cwd, depth + 1)
       if pcDir in kinds:
         match(path)
 
@@ -270,11 +267,11 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       let path = format(descendent.path)
       var resolved = Path(expandSymlink(path.string))
       if resolved == Path("/"): continue # Special case this
-      var absResolved = absolute(resolved)
+      var absResolved = absolutePath(resolved, cwd)
       if absResolved.string[^1] != '/': absResolved &= '/'
       if resolved.string[^1] != '/': resolved &= '/'
       if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior, depth + 1)
+        m.spawn findDirRec(m, resolved, patterns, kinds, followSymlinks, behavior, cwd, depth + 1)
 
       if pcLinkToDir in kinds:
         match(path)
@@ -283,21 +280,21 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       let path = format(descendent.path)
       match(path)
 
-  let absolute = isAbsolute(dir)
   if behavior.kind == coloredPrint:
-    for descendent in dir.string.walkDirStat(relative = not absolute):
+    for descendent in dir.string.walkDirStat(relative = not isAbsolute(dir)):
       loop()
   else:
-    for descendent in dir.string.walkDir(relative = not absolute):
+    for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
       loop()
 
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: RunOption): seq[Found] =
   var m = createMaster()
+  let cwd = getCurrentDir()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior, 1)
+        m.spawn findDirRec(getHandle m, path, patterns, kinds, followSymlinks, behavior, cwd, 1)
 
       elif info.kind in kinds:
         let found = path.findPath(patterns)
@@ -320,9 +317,9 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
 
           case behavior.kind
           of plainPrint:
-            print(path, behavior)
+            print(path, behavior, cwd)
           of coloredPrint:
-            print(path, behavior, color(getFound(), patterns))
+            print(path, behavior, cwd, color(getFound(), patterns))
           of collect: findings.add getFound()
           of exec: run(m.getHandle, behavior.cmds, getFound())
         elif behavior.kind in {plainPrint, coloredPrint}:

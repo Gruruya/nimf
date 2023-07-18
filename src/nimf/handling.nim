@@ -39,7 +39,6 @@ type
       case hyperlink*: bool
       of true:
         hyperlinkPrefix*: string
-        cwd*: string
       else: discard
     of exec:
       cmds*: seq[Command]
@@ -51,7 +50,6 @@ proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; 
     result = RunOption(kind: kind, null: null, maxDepth: maxDepth, maxFound: maxFound, searchAll: searchAll, hyperlink: hyperlink)
     if hyperlink:
       result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
-      result.cwd = encodeHyperlink(os.getCurrentDir()) & '/'
 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()

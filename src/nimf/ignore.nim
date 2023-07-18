@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import std/sets, ./find
+from std/os import isAbsolute
 
 const ignoredDirs* = toHashSet([
   ".git",
@@ -10,7 +11,7 @@ const ignoredDirs* = toHashSet([
   "venv", "node_modules"])
 
 func filename(path: string): string {.inline.} =
-  if path.len > 1 and path[0] == '/': # Doesn't strip `./`
+  if path.len > 1 and path.isAbsolute: # Doesn't strip `./`
     let lastSlash = path.rfind(['/'], start = 1, last = path.high)
     if lastSlash.isSome: path[lastSlash.unsafeGet + 1..path.high]
     else: path[1 .. ^1]
