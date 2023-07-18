@@ -226,6 +226,8 @@ proc notFoundPrint() =
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; followSymlinks: bool; behavior: RunOption; depth: Positive) {.gcsafe.} =
+  if behavior.maxFound != 0 and numFound.load() >= behavior.maxFound: return
+
   template loop: untyped =
     template format(path: string): Path =
       if absolute or dir.string in [".", "./"]: Path(path)
@@ -304,7 +306,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
-          if behavior.maxFound != 0 and numFound.fetchAdd(1) >= behavior.maxFound: continue
+          if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
           template getFound: Found =
             if behavior.kind == coloredPrint:
               case info.kind
