@@ -64,9 +64,9 @@ proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchA
 proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
   assert kind in {plainPrint, coloredPrint}
   result = RunOption.init(kind, followSymlinks, searchAll, maxDepth, maxFound)
-  # {.cast(uncheckedAssign).}:
   result.null = null
-  result.hyperlink = hyperlink
+  {.cast(uncheckedAssign).}:
+    result.hyperlink = hyperlink
   if hyperlink:
     result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
     result.hyperlinkCwd = encodeHyperlink(if followSymlinks: result.cwd.string else: os.getCurrentDir()) & '/'
