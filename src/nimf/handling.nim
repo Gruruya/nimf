@@ -44,14 +44,13 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; depth: int; all: bool): T =
+proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; maxDepth: int; searchAll: bool): T =
   assert kind in {plainPrint, coloredPrint}
   {.cast(uncheckedAssign).}:
+    result = RunOption(kind: kind, null: null, maxDepth: maxDepth, searchAll: searchAll, hyperlink: hyperlink)
     if hyperlink:
-      RunOption(kind: kind, null: null, maxDepth: depth, searchAll: all, hyperlink: true,
-                hyperlinkPrefix: "\e]8;;file://" & encodeHyperlink(getHostname()),
-                cwd: encodeHyperlink(os.getCurrentDir()) & '/')
-    else: RunOption(kind: kind, null: null, maxDepth: depth, searchAll: all, hyperlink: false)
+      result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
+      result.cwd = encodeHyperlink(os.getCurrentDir()) & '/'
 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()
