@@ -183,18 +183,18 @@ var numFound: Atomic[int]
 
 {.push inline.}
 
-func wrapHyperlink(path: Path, prefix: string, cwd: Path, display = path.string): string =
+func wrapHyperlink(path: Path, prefix: string, encodedCwd: string, display = path.string): string =
   result = prefix
   if not path.isAbsolute:
-    result.add cwd.string
+    result.add encodedCwd
   result.add encodeHyperlink(path.string)
   result.add "\e\\"
   result.add display
   result.add "\e]8;;\e\\"
 
-proc print(path: Path; behavior: RunOption; cwd: Path; display = path.string) =
+proc print(path: Path; behavior: RunOption; display = path.string) =
   template line: string =
-    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, cwd, display)
+    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
      else: display) & (if behavior.null: '\0' else: '\n')
 
   {.gcsafe.}:
@@ -238,9 +238,9 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
       case behavior.kind
       of plainPrint:
-        print(path, behavior, cwd)
+        print(path, behavior)
       of coloredPrint:
-        print(path, behavior, cwd, ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)))
+        print(path, behavior, ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)))
       of collect: findings.add descendent.toFound(path, matches = found)
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
@@ -286,8 +286,10 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
       loop()
 
-proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: RunOption): seq[Found] =
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: sink RunOption): seq[Found] =
   let cwd = getCurrentDir()
+  if behavior.hyperlink:
+    {.cast(uncheckedAssign).}: behavior.hyperlinkCwd = encodeHyperlink(cwd.string) & '/'
   var m = createMaster()
   m.awaitAll:
     for i, path in paths:
@@ -316,9 +318,9 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
 
           case behavior.kind
           of plainPrint:
-            print(path, behavior, cwd)
+            print(path, behavior)
           of coloredPrint:
-            print(path, behavior, cwd, color(getFound(), patterns))
+            print(path, behavior, color(getFound(), patterns))
           of collect: findings.add getFound()
           of exec: run(m.getHandle, behavior.cmds, getFound())
         elif behavior.kind in {plainPrint, coloredPrint}:

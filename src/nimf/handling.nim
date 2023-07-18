@@ -39,6 +39,7 @@ type
       case hyperlink*: bool
       of true:
         hyperlinkPrefix*: string
+        hyperlinkCwd*: string
       else: discard
     of exec:
       cmds*: seq[Command]
