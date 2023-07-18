@@ -209,7 +209,7 @@ proc ctrlc() {.noconv.} =
   findMaster.cancel()
   stdout.write "\e]8;;\e\\"  # Close hyperlinks
   stdout.write ansiResetCode # Clear style
-  stdout.writeLine "SIGINT: Interrupted by Ctrl-C."
+  stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
   quit(128 + 2)
 
 setControlCHook(ctrlc)

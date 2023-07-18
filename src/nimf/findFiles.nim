@@ -330,7 +330,6 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
   if not cancelled(findMaster):
     case behavior.kind
     of plainPrint, coloredPrint:
-      if printQueue.len > 0: stdout.write printQueue
-      stdout.write "\e[0m"; stdout.flushFile()
+      if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
     of collect: result &= findings.found.value
     else: discard
