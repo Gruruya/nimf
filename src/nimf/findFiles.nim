@@ -265,7 +265,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path)
-      var resolved = Path(expandSymlink(path.string))
+      var resolved = try: Path(expandSymlink(path.string)) except: continue
       if resolved == Path("/"): continue # Special case this
       var absResolved = absolutePath(resolved, cwd)
       if absResolved.string[^1] != '/': absResolved &= '/'
@@ -288,8 +288,8 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       loop()
 
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: RunOption): seq[Found] =
-  var m = createMaster()
   let cwd = getCurrentDir()
+  var m = createMaster()
   m.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
