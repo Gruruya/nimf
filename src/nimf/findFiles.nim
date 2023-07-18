@@ -4,7 +4,7 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-import ./[common, find, handling, ignore], std/[os, paths, locks, posix, sets, hashes], pkg/malebolgia
+import ./[common, find, handling, ignore], std/[os, paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -178,6 +178,7 @@ var printQueue = newStringOfCap(8192)
 var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
+var numFound: Atomic[int]
 
 {.push inline.}
 
@@ -235,6 +236,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       else: absolutePath(path)
 
     template wasFound(path: Path; found: seq[(int, int)]) =
+      if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
       case behavior.kind
       of plainPrint:
         print(path, behavior)
@@ -302,6 +304,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
       elif info.kind in kinds:
         let found = path.findPath(patterns)
         if found.len > 0:
+          if behavior.maxFound != 0 and numFound.fetchAdd(1) >= behavior.maxFound: continue
           template getFound: Found =
             if behavior.kind == coloredPrint:
               case info.kind

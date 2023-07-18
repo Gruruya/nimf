@@ -30,8 +30,9 @@ type
     plainPrint, coloredPrint, collect, exec
 
   RunOption* = object
-    maxDepth* = 0
     searchAll*: bool
+    maxDepth* = 0
+    maxFound* = 0
     case kind*: RunOptionKind
     of plainPrint, coloredPrint:
       null*: bool
@@ -44,10 +45,10 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; maxDepth: int; searchAll: bool): T =
+proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; searchAll: bool; maxDepth: int; maxFound: int): T =
   assert kind in {plainPrint, coloredPrint}
   {.cast(uncheckedAssign).}:
-    result = RunOption(kind: kind, null: null, maxDepth: maxDepth, searchAll: searchAll, hyperlink: hyperlink)
+    result = RunOption(kind: kind, null: null, maxDepth: maxDepth, maxFound: maxFound, searchAll: searchAll, hyperlink: hyperlink)
     if hyperlink:
       result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
       result.cwd = encodeHyperlink(os.getCurrentDir()) & '/'
