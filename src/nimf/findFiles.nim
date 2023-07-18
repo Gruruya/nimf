@@ -230,7 +230,7 @@ proc notFoundPrint() =
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
-  if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
+  if m.cancelled or behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
     template format(path: string): Path =
@@ -248,6 +248,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
 
     template match(path: Path) =
+      if m.cancelled: return
       let found = path.findPath(patterns)
       if found.len > 0:
         wasFound(path, found)
@@ -289,13 +290,13 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
       loop()
 
+var findMaster* = createMaster()
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; behavior: sink RunOption): seq[Found] =
-  var m = createMaster()
-  m.awaitAll:
+  findMaster.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        m.spawn findDirRec(getHandle m, path, patterns, kinds, behavior, 1)
+        findMaster.spawn findDirRec(getHandle findMaster, path, patterns, kinds, behavior, 1)
 
       elif info.kind in kinds:
         let found = path.findPath(patterns)
@@ -322,13 +323,14 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
           of coloredPrint:
             print(path, behavior, color(getFound(), patterns))
           of collect: findings.add getFound()
-          of exec: run(m.getHandle, behavior.cmds, getFound())
+          of exec: run(findMaster.getHandle, behavior.cmds, getFound())
         elif behavior.kind in {plainPrint, coloredPrint}:
           notFoundPrint()
 
-  case behavior.kind
-  of plainPrint, coloredPrint:
-    if printQueue.len > 0: stdout.write printQueue
-    stdout.write "\e[0m"; stdout.flushFile()
-  of collect: result &= findings.found.value
-  else: discard
+  if not cancelled(findMaster):
+    case behavior.kind
+    of plainPrint, coloredPrint:
+      if printQueue.len > 0: stdout.write printQueue
+      stdout.write "\e[0m"; stdout.flushFile()
+    of collect: result &= findings.found.value
+    else: discard

@@ -202,6 +202,17 @@ func argHelp*(dfl: set[PathComponent], a: var ArgcvtParams): seq[string]=
   argAggHelp(dflSeq, "set", typ, df)
   result = @[ a.argKeys, typ, df ]
 
+from pkg/malebolgia {.all.} import globalStopToken, cancel
+from std/atomics import store
+proc ctrlc() {.noconv.} =
+  globalStopToken.store(true)
+  findMaster.cancel()
+  stdout.write "\e]8;;\e\\"  # Close hyperlinks
+  stdout.write ansiResetCode # Clear style
+  stdout.writeLine "SIGINT: Interrupted by Ctrl-C."
+  quit(128 + 2)
+
+setControlCHook(ctrlc)
 
 proc f*() =
   const nimbleFile = staticRead(currentSourcePath().parentDir.parentDir / "nimf.nimble")
