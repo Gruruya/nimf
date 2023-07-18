@@ -85,15 +85,15 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
     if displayColor:
       lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
-      discard traverse(RunOption.init(coloredPrint, followSymlinks, all, max_depth, limit, null, hyperlink))
+      discard traverse(RunOption.init(coloredPrint, follow_symlinks, all, max_depth, limit, null, hyperlink))
     else:
-      discard traverse(RunOption.init(plainPrint, followSymlinks, all, max_depth, limit, null, hyperlink))
+      discard traverse(RunOption.init(plainPrint, follow_symlinks, all, max_depth, limit, null, hyperlink))
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(RunOption.init(collect, followSymlinks, all, max_depth, limit)))
+      run(execute, traverse(RunOption.init(collect, follow_symlinks, all, max_depth, limit)))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(RunOption.init(exec, followSymlinks, all, max_depth, limit, cmds))
+      discard traverse(RunOption.init(exec, follow_symlinks, all, max_depth, limit, cmds))
 
 #[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
@@ -213,7 +213,7 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"types": 't', "max_depth": 'd', "followSymlinks": 'L', "null": '0'},
+           short = {"types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
            help = {"all": "Search all directories, normally a few choice directories are skipped.",
                    "types": "Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
