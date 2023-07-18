@@ -291,10 +291,6 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     for descendent in dir.string.walkDir(relative = not absolute):
       loop()
 
-func stripDot(p: Path): Path {.inline.} =
-  if p.string.len > 2 and p.string[0..1] == "./": Path(p.string[2..^1])
-  else: p
-
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; followSymlinks = false; behavior: RunOption): seq[Found] =
   var m = createMaster()
   m.awaitAll:
@@ -313,14 +309,14 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
               of pcFile:
                 var s: Stat
                 if lstat(cstring path.string, s) < 0'i32: continue
-                Found(path: path.stripDot, kind: pcFile, matches: found, stat: some s)
+                Found(path: path, kind: pcFile, matches: found, stat: some s)
               of pcLinkToFile:
                 var s: Stat
                 let broken = stat(cstring path.string, s) < 0'i32
-                Found(path: path.stripDot, kind: pcLinkToFile, matches: found, broken: broken)
+                Found(path: path, kind: pcLinkToFile, matches: found, broken: broken)
               else:
-                Found(path: path.stripDot, kind: info.kind, matches: found)
-            else: Found(path: path.stripDot, kind: info.kind, matches: found)
+                Found(path: path, kind: info.kind, matches: found)
+            else: Found(path: path, kind: info.kind, matches: found)
 
           case behavior.kind
           of plainPrint:
