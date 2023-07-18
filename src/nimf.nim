@@ -154,8 +154,13 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
         var parsed, default: set[FileKind]
         a.val = tok
 
-        if a.val == "l":
+        case a.val
+        of "l":
           parsed.incl link
+        of "f":
+          parsed.incl {file, lfile}
+        of "d":
+          parsed.incl {directory, ldirectory}
         elif not argParse(parsed, default, a):
           result = {}; a.sep = old
           raise newException(ElementError, "Bad element " & $i)
