@@ -125,13 +125,15 @@ proc argHelp*(dfl: Flag; a: var ArgcvtParams): seq[string] =
 
 # For `-t=f`
 type FileKind = enum
-  file, directory, link, any
+  file, directory, link, lfile, ldirectory, any
 
 func to(filetype: FileKind, T: type set[PathComponent]): T =
   case filetype
-  of file: {pcFile, pcLinkToFile}
-  of directory: {pcDir, pcLinkToDir}
+  of file: {pcFile}
+  of directory: {pcDir}
   of link: {pcLinkToFile, pcLinkToDir}
+  of lfile: {pcLinkToFile}
+  of ldirectory: {pcLinkToDir}
   of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
 
 proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var ArgcvtParams): bool =
@@ -152,7 +154,9 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
         var parsed, default: set[FileKind]
         a.val = tok
 
-        if not argParse(parsed, default, a):
+        if a.val == "l":
+          parsed.incl link
+        elif not argParse(parsed, default, a):
           result = {}; a.sep = old
           raise newException(ElementError, "Bad element " & $i)
 
