@@ -265,7 +265,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
     elif followSymlinks and descendent.kind == pcLinkToDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path)
-      var resolved = try: Path(expandSymlink(path.string)) except: continue
+      var resolved = try: dir / Path(expandSymlink(path.string)) except: continue
       if resolved == Path("/"): continue # Special case this
       if resolved.string[^1] != '/': resolved &= '/'
       let absResolved = absolutePath(resolved, cwd)
