@@ -230,7 +230,7 @@ proc notFoundPrint() =
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
-  if m.cancelled or behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
+  if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
     template format(path: string): Path =
