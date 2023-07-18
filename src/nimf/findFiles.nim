@@ -255,7 +255,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         notFoundPrint()
 
     if descendent.kind == pcDir:
-      if not behavior.searchAll and descendent.path in ignoredDirs: continue
+      if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path) & '/'
       if followSymlinks:
         let absPath = path.absolute
@@ -266,7 +266,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         match(path)
 
     elif followSymlinks and descendent.kind == pcLinkToDir:
-      if not behavior.searchAll and descendent.path in ignoredDirs: continue
+      if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path)
       var resolved = Path(expandSymlink(path.string))
       if resolved == Path("/"): continue # Special case this
