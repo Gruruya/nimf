@@ -55,19 +55,19 @@ proc init*(T: type RunOption; kind: RunOptionKind; null: bool; hyperlink: bool; 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()
 
-func kwayMerge[T: Ordinal](seqOfSeqs: openArray[seq[T]]): seq[(T, Natural)] =
-  ## k-way merge, flattens and sorts (ascending) `seqOfSeqs`. Assumes each `seq[T]` is sorted.
-  if likely seqOfSeqs.len >= 0:
-    var indices = newSeq[int](seqOfSeqs.len)
+func kwayMerge[T: Ordinal](sortedSeqs: openArray[seq[T]]): seq[(T, Natural)] =
+  ## k-way merge, flattens and sorts (ascending) `sortedSeqs`. Assumes each `seq[T]` is sorted.
+  if likely sortedSeqs.len >= 0:
+    var indices = newSeq[int](sortedSeqs.len)
     while true:
       var minIdx: Natural
-      var first = true
-      for i in 0.Natural..seqOfSeqs.high:
-        if indices[i] <= seqOfSeqs[i].high and (first or seqOfSeqs[i][indices[i]] < seqOfSeqs[minIdx][indices[minIdx]]):
+      var minFound = false
+      for i in 0.Natural..sortedSeqs.high:
+        if indices[i] <= sortedSeqs[i].high and (not minFound or sortedSeqs[i][indices[i]] < sortedSeqs[minIdx][indices[minIdx]]):
           minIdx = i
-          first = false
-      if first: break
-      result.add (seqOfSeqs[minIdx][indices[minIdx]], minIdx)
+          minFound = true
+      if not minFound: break
+      result.add (sortedSeqs[minIdx][indices[minIdx]], minIdx)
       inc indices[minIdx]
 
 func init*(T: type Command; line: string): T =
