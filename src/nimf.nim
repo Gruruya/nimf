@@ -125,15 +125,15 @@ proc argHelp*(dfl: Flag; a: var ArgcvtParams): seq[string] =
 
 # For `-t=f`
 type FileKind = enum
-  file, directory, link, lfile, ldirectory, any
+  file, directory, link, any, lfile, flink, ldirectory, dlink
 
 func to(filetype: FileKind, T: type set[PathComponent]): T =
   case filetype
   of file: {pcFile}
   of directory: {pcDir}
   of link: {pcLinkToFile, pcLinkToDir}
-  of lfile: {pcLinkToFile}
-  of ldirectory: {pcLinkToDir}
+  of lfile, flink: {pcLinkToFile}
+  of ldirectory, dlink: {pcLinkToDir}
   of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
 
 proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var ArgcvtParams): bool =
