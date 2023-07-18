@@ -5,8 +5,9 @@
 ## The CLI interface for nimf
 import ./nimf/[find, findFiles, color, handling],
        pkg/[cligen, cligen/argcvt],
-       std/[paths, terminal, exitprocs]
+       std/[paths, exitprocs]
 import std/os except getCurrentDir
+from   std/terminal import isatty, resetAttributes
 from   std/strutils import startsWith, toLowerAscii
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen

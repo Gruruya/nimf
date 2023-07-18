@@ -20,9 +20,12 @@ type
     of pcLinkToFile:
       broken*: bool
     else: discard
+  Locked[T] = object
+    value*: T
+    lock*: Lock
   Findings = object
-    found*: tuple[paths: seq[Found], lock: Lock]
-    dirs*: tuple[paths: HashSet[Path], lock: Lock]
+    found*: Locked[seq[Found]]
+    dirs*: Locked[HashSet[Path]]
 
 proc toFound(file: File, path: Path, matches: seq[(int, int)]): Found =
   result = Found(path: path, matches: matches, kind: file.kind)
@@ -37,7 +40,7 @@ proc toFound(file: tuple[kind: PathComponent, path: string], path: Path, matches
   Found(path: path, matches: matches, kind: file.kind)
 
 proc init(T: typedesc[Findings]): T =
-  result.dirs.paths = initHashset[Path]()
+  result.dirs.value = initHashset[Path]()
   initLock(result.found.lock)
   initLock(result.dirs.lock)
 
@@ -49,11 +52,11 @@ template withLock(lock: Lock; body: untyped): untyped =
 
 proc addImpl(findings: var Findings; found: Found) {.inline.} =
   withLock(findings.found.lock):
-    findings.found.paths.add found
+    findings.found.value.add found
 
 proc seenOrInclImpl(findings: var Findings; dir: Path): bool {.inline.} =
   withLock(findings.dirs.lock):
-    result = findings.dirs.paths.containsOrIncl dir
+    result = findings.dirs.value.containsOrIncl dir
 
 template add(findings: var Findings; found: Found) = {.gcsafe.}: addImpl(findings, found)
 template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenOrInclImpl(findings, dir)
@@ -325,6 +328,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
 
   case behavior.kind
   of plainPrint, coloredPrint:
-    if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
-  of collect: result &= findings.found.paths
+    if printQueue.len > 0: stdout.write printQueue
+    stdout.write "\e[0m"; stdout.flushFile()
+  of collect: result &= findings.found.value
   else: discard
