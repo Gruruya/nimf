@@ -25,7 +25,7 @@ Options:
   --help-syntax                                advanced: prepend,plurals,..
   --version              bool           false  print version
   -a, --all              bool           false  Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.
-  -x=, --exclude=        strings        {}     Add file/dirname patterns to ignore.
+  -x=, --exclude=        strings        {}     Add patterns to ignore.
   -t=, --types=          set(filetype)  any    Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.
   -e=, --execute=        strings        {}     Execute a command for each matching search result in parallel.
                                                Alternatively, end this argument with "+" to execute the command once with all results as arguments.

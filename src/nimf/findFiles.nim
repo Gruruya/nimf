@@ -265,10 +265,10 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
         notFoundPrint()
 
     if behavior.exclude.len != 0:
-      (var found = false; for pattern in behavior.exclude:
-         if pattern.find(['/'], 1, pattern.high - 1).isSome:
-           if filenameMatches(absolute(descendent.path), pattern): (found = true; break)
-         elif filenameMatches(filename(descendent.path), pattern): (found = true; break)
+      (var found = false; for x in behavior.exclude:
+         if x.fullmatch:
+           if filenameMatches(absolute(descendent.path), x.pattern): (found = true; break)
+         elif filenameMatches(filename(descendent.path), x.pattern): (found = true; break)
        if found: continue)
 
     if descendent.kind == pcDir:

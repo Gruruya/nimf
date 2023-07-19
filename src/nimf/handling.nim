@@ -31,7 +31,7 @@ type
 
   RunOption* = object
     searchAll*: bool
-    exclude*: seq[string]
+    exclude*: seq[tuple[pattern: string, fullmatch: bool]]
     maxDepth* = 0
     maxFound* = 0
 
@@ -53,7 +53,9 @@ type
     else: discard
 
 proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int): T {.inline.} =
-  result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, exclude: exclude, maxDepth: maxDepth, maxFound: maxFound)
+  result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
+  for x in exclude:
+    if x.len > 0: result.exclude.add (x, x.len > 1 and x.find(['/'], 1, x.high - 1).isSome)
   if followSymlinks:
     result.cwd = paths.getCurrentDir()
 
