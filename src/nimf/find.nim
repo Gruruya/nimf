@@ -85,10 +85,14 @@ func rfindI*(text, pattern: openArray[char], last: Natural): Option[Natural] =
 func rfindI*(text, pattern: openArray[char]): Option[Natural] =
   rfindI(text, pattern, pattern.high, text.high)
 
+func containsAny*(string: openArray[char], chars: set[char]): bool {.inline.} =
+  for c in string:
+    if c in chars: return true
+  result = false
+
 func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
   for string in strings:
-    for c in string:
-      if c in chars: return true
+    if string.containsAny(chars): return true
   result = false
 
 func find*(text: openArray[char], patterns: openArray[string], start: sink Natural = 0, last: sink int = -1): seq[Natural] =
