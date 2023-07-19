@@ -41,17 +41,16 @@ proc getIgnored(): HashSet[string] {.inline.} =
 
   var tried {.global.} = false
   var found {.global.}: HashSet[string]
-  if not tried:
+  if unlikely (not tried):
     tried = true
     try: result = readConfig(); found = result
     except: result = defaultIgnored
-  elif found.len > 0: result = found
-  else: result = defaultIgnored
+  else: result = if found.len > 0: found else: defaultIgnored
 
 func filename(path: string): string {.inline.} =
-  if path.len > 1 and path.isAbsolute: # Doesn't strip `./`
+  if likely path.len > 1 and path.isAbsolute: # Doesn't strip `./`
     let lastSlash = path.rfind(['/'], start = 1, last = path.high)
-    if lastSlash.isSome: path[lastSlash.unsafeGet + 1..path.high]
+    if likely lastSlash.isSome: path[lastSlash.unsafeGet + 1..path.high]
     else: path[1 .. ^1]
   else: path
 
