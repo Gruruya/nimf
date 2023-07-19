@@ -22,11 +22,25 @@ proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[s
         if c in separators:
           afterComment = false
         continue
+      template checkEscaped: untyped =
+        if s.len > 0:
+          if s[^1] == '\\':
+            if s.len == 1:
+              s[0] = move(c)
+              continue
+            else:
+              s.setLen(s.len - 1) # Cut off one "\" from "\\#" or "\#"
+              if s[^1] != '\\':
+                stripStart = -1
+                s.add move(c)
+                continue
       case c
       of separators:
+        checkEscaped()
         stripStart = -1
         if s.len > 0: yield move(s)
       of comment:
+        checkEscaped()
         afterComment = true
         if s.len > 0:
           if stripStart == 0:
