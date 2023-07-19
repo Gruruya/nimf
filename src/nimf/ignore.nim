@@ -8,7 +8,9 @@ from std/os import isAbsolute
 const ignoredDirs* = toHashSet([
   ".git",
   ".cache", "nimcache", "__pycache__",
-  "venv", "node_modules"])
+  "venv", "node_modules",
+  ".npm", ".cargo"
+  ])
 
 func filename(path: string): string {.inline.} =
   if path.len > 1 and path.isAbsolute: # Doesn't strip `./`
