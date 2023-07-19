@@ -8,6 +8,7 @@ import ./[common, find, handling, ignore], std/[paths, locks, atomics, posix, se
 import std/os except getCurrentDir
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
+proc len(p: Path): int {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
 proc hash(x: Path): Hash {.inline, borrow.}
 
@@ -105,8 +106,8 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
     if '/' in patterns[i]:
       filenameSep = i
       break
-  let lastSep = block:
-    if path.string.len == 1: 0
+  let lastSep =
+    if path.len == 1: 0
     else: path.string.rfind("/", last = path.string.high - 1).get(0)
 
   var last = path.string.high
@@ -120,6 +121,9 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
       if found.isNone: return @[]
       result[i] = found.unsafeGet
       last = result[i][0] - 1
+
+proc filenameMatches(filename: string; pattern: openArray[char]): bool =
+  rfind(Path(filename), pattern, 0, filename.high, false).isSome
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   # `walkDir` which yields an object containing the `Stat` if the path was a link
@@ -231,9 +235,13 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
   if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
+    template trailingSlash(path: Path): Path =
+      if descendent.kind == pcDir: path & '/'
+      else: path
+
     template format(path: string): Path =
-      if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
-      else: dir / Path(path)
+      (if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
+       else: dir / Path(path)).trailingSlash
 
     template wasFound(path: Path; found: seq[(int, int)]) =
       if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
@@ -255,12 +263,12 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
 
     if behavior.exclude.len != 0:
       (var found = false; for pattern in behavior.exclude:
-        if descendent.path.find(pattern).isSome: (found = true; break)
-      if found: continue)
+         if filenameMatches(descendent.path, pattern): (found = true; break)
+       if found: continue)
 
     if descendent.kind == pcDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
-      let path = format(descendent.path) & '/'
+      let path = format(descendent.path)
       if behavior.followSymlinks:
         let absPath = absolutePath(path, behavior.cwd)
         if findings.seenOrIncl absPath: continue
