@@ -34,11 +34,7 @@ type
     exclude*: seq[tuple[pattern: string, fullmatch: bool]]
     maxDepth* = 0
     maxFound* = 0
-
-    case followSymlinks*: bool
-    of true:
-      cwd*: Path
-    else: discard
+    followSymlinks*: bool
 
     case kind*: RunOptionKind
     of plainPrint, coloredPrint:
@@ -56,8 +52,6 @@ proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchA
   result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
   for x in exclude:
     if x.len > 0: result.exclude.add (x, x.len > 1 and x.find(['/'], 1, x.high - 1).isSome)
-  if followSymlinks:
-    result.cwd = paths.getCurrentDir()
 
 proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
   assert kind == exec
@@ -72,7 +66,7 @@ proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchA
     result.hyperlink = hyperlink
   if hyperlink:
     result.hyperlinkPrefix = "\e]8;;file://" & encodeHyperlink(getHostname())
-    result.hyperlinkCwd = encodeHyperlink(if followSymlinks: result.cwd.string else: os.getCurrentDir()) & '/'
+    result.hyperlinkCwd = encodeHyperlink(os.getCurrentDir()) & '/'
 
 const Targets = (proc(): array[Target.enumLen, string] =
                    for t in Target: result[ord(t)] = $t)()

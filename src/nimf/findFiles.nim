@@ -123,7 +123,7 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
       last = result[i][0] - 1
 
 proc filenameMatches(filename: string; pattern: openArray[char]): bool =
-  rfind(Path(filename), pattern, 0, filename.high, true).isSome
+  rfind(Path(filename), pattern, pattern.high, filename.high, true).isSome
 
 template filenameMatches(filename: Path; pattern: openArray[char]): bool =
   filenameMatches(filename.string, pattern)
@@ -234,17 +234,17 @@ proc notFoundPrint() =
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensitive: bool; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; sensitive: bool; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
   if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
-    template absolute(path: string): Path =
+    template relPath(path: string): Path =
       (if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
        else: dir / Path(path))
 
     template format(path: string): Path =
-      if descendent.kind == pcLinkToDir: absolute(path) & '/'
-      else: absolute(path)
+      if descendent.kind == pcLinkToDir: relPath(path) & '/'
+      else: relPath(path)
 
     template wasFound(path: Path; found: seq[(int, int)]) =
       if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
@@ -267,30 +267,30 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
     if behavior.exclude.len != 0:
       (var found = false; for x in behavior.exclude:
          if x.fullmatch:
-           if filenameMatches(absolute(descendent.path), x.pattern): (found = true; break)
+           if filenameMatches(absolutePath(Path descendent.path, cwd), x.pattern): (found = true; break)
          elif filenameMatches(filename(descendent.path), x.pattern): (found = true; break)
        if found: continue)
 
     if descendent.kind == pcDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
-      let path = absolute(descendent.path) & '/'
+      let path = relPath(descendent.path) & '/'
       if behavior.followSymlinks:
-        let absPath = absolutePath(path, behavior.cwd)
+        let absPath = absolutePath(path, cwd)
         if findings.seenOrIncl absPath: continue
       if behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth:
-        m.spawn findDirRec(m, path, patterns, sensitive, kinds, behavior, depth + 1)
+        m.spawn findDirRec(m, path, cwd, patterns, sensitive, kinds, behavior, depth + 1)
       if pcDir in kinds:
         match(path)
 
     elif behavior.followSymlinks and descendent.kind == pcLinkToDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
-      let path = absolute(descendent.path)
+      let path = relPath(descendent.path)
       var resolved = try: dir / Path(expandSymlink(path.string)) except: continue
       if resolved == Path("/"): continue # Special case this
       if resolved.string[^1] != '/': resolved &= '/'
-      let absResolved = absolutePath(resolved, behavior.cwd)
+      let absResolved = absolutePath(resolved, cwd)
       if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, sensitive, kinds, behavior, depth + 1)
+        m.spawn findDirRec(m, resolved, cwd, patterns, sensitive, kinds, behavior, depth + 1)
 
       if pcLinkToDir in kinds:
         match(path & '/')
@@ -309,11 +309,12 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
 var findMaster* = createMaster()
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; behavior: sink RunOption): seq[Found] =
   let sensitive = patterns.containsAny({'A'..'Z'})
+  let cwd = getCurrentDir()
   findMaster.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        findMaster.spawn findDirRec(getHandle findMaster, path, patterns, sensitive, kinds, behavior, 1)
+        findMaster.spawn findDirRec(getHandle findMaster, path, cwd, patterns, sensitive, kinds, behavior, 1)
 
       elif info.kind in kinds:
         let found = path.findPath(patterns, sensitive)
