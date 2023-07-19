@@ -8,73 +8,89 @@
 import std/[os, sets], ./find
 import std/[memfiles, streams]
 
-proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] {.inline.} =
-  type chars = char | set[char]
-  iterator readSV(path: string; separate: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
-    ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
-    var ms = newMemMapFileStream(path)
-    var afterComment = false
-    var stripStart = -1
-    var s = newStringOfCap(16)
-    while not ms.atEnd:
-      var c = ms.readChar()
-      if afterComment:
-        if c in separate:
-          afterComment = false
-        continue
-      template checkEscaped: untyped =
-        if s.len > 0:
-          if s[^1] == '\\':
-            if s.len == 1:
-              s[0] = c
-              continue
-            else:
-              s.setLen(s.len - 1) # Cut off one "\" from "\\#" or "\#"
-              if s[^1] != '\\':
-                stripStart = -1
-                s.add c
-                continue
-      case c
-      of separate:
-        checkEscaped()
-        stripStart = -1
-        if s.len > 0: yield move(s)
-      of comment:
-        checkEscaped()
-        afterComment = true
-        if s.len > 0:
-          if stripStart == 0:
-            s.setLen 0
-            stripStart = -1
-          elif stripStart != -1:
-            s.setLen stripStart
-            stripStart = -1
-            yield move(s)
+template readSVImpl(condition: bool, getChar: char): untyped =
+  var afterComment = false
+  var stripStart = -1
+  var s = newStringOfCap(16)
+  while condition:
+    var c = getChar
+    if afterComment:
+      if c in separate:
+        afterComment = false
+      continue
+    template checkEscaped: untyped =
+      if s.len > 0:
+        if s[^1] == '\\':
+          if s.len == 1:
+            s[0] = c
+            continue
           else:
-            yield move(s)
-      of strip:
-        if stripStart == -1: stripStart = s.len
-        s.add c
+            s.setLen(s.len - 1) # Cut off one "\" from "\\#" or "\#"
+            if s[^1] != '\\':
+              stripStart = -1
+              s.add c
+              continue
+    template ymove(s: var string): untyped =
+      when nimvm:
+        yield s
+        s.setLen 0
       else:
-        stripStart = -1
-        s.add c
-    if s.len > 0:
-      yield move(s)
-    ms.close()
+        yield move(s)
+    case c
+    of separate:
+      checkEscaped()
+      stripStart = -1
+      if s.len > 0:
+        ymove s
+    of comment:
+      checkEscaped()
+      afterComment = true
+      if s.len > 0:
+        if stripStart == 0:
+          s.setLen 0
+          stripStart = -1
+        elif stripStart != -1:
+          s.setLen stripStart
+          stripStart = -1
+          ymove s
+        else:
+          ymove s
+    of strip:
+      if stripStart == -1: stripStart = s.len
+      s.add c
+    else:
+      stripStart = -1
+      s.add c
+  if s.len > 0:
+    yield move(s)
 
+type chars = char | set[char]
+
+iterator readSV(path: string; separate: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
+  ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
+  var ms = newMemMapFileStream(path)
+  readSVImpl(not ms.atEnd, ms.readChar())
+  ms.close()
+
+iterator staticReadSV(path: string; separate: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
+  ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
+  var file = staticRead(path)
+  var i = -1
+  readSVImpl((inc i; i <= file.high), file[i])
+
+proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] =
   result = static: initHashSet[string]()
   for s in readSV(path, {',', '\l'}):
     result.incl s
 
+proc staticReadConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] {.compileTime.} =
+  result = initHashSet[string]()
+  for s in staticReadSV(path, {',', '\l'}):
+    result.incl s
+
 var found {.global.}: HashSet[string]
 proc getIgnored(): HashSet[string] {.inline.} =
-  const defaultIgnored =
-    toHashSet([
-      ".git",
-      ".cache", "nimcache", "__pycache__",
-      "venv", "node_modules",
-      ".npm", ".rustup", ".cargo"
-    ])
+  const defaultIgnored = staticReadConfig(currentSourcePath() /../ "ignore.csv")
 
   var tried {.global.} = false
   if not tried:
