@@ -10,7 +10,7 @@ import std/[memfiles, streams]
 
 proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] {.inline.} =
   type chars = char | set[char]
-  iterator readSV(path: string; separators: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
+  iterator readSV(path: string; separate: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
     ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
     var ms = newMemMapFileStream(path)
     var afterComment = false
@@ -19,23 +19,23 @@ proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[s
     while not ms.atEnd:
       var c = ms.readChar()
       if afterComment:
-        if c in separators:
+        if c in separate:
           afterComment = false
         continue
       template checkEscaped: untyped =
         if s.len > 0:
           if s[^1] == '\\':
             if s.len == 1:
-              s[0] = move(c)
+              s[0] = c
               continue
             else:
               s.setLen(s.len - 1) # Cut off one "\" from "\\#" or "\#"
               if s[^1] != '\\':
                 stripStart = -1
-                s.add move(c)
+                s.add c
                 continue
       case c
-      of separators:
+      of separate:
         checkEscaped()
         stripStart = -1
         if s.len > 0: yield move(s)
@@ -54,10 +54,10 @@ proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[s
             yield move(s)
       of strip:
         if stripStart == -1: stripStart = s.len
-        s.add move(c)
+        s.add c
       else:
         stripStart = -1
-        s.add move(c)
+        s.add c
     if s.len > 0:
       yield move(s)
     ms.close()
