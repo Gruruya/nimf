@@ -42,6 +42,7 @@ template getIt*[T, R](self: Option[T], callback: untyped; otherwise: R): R =
     otherwise
 
 template filename*(path: string): string =
+  ## For `walkDir` `descendent.path`, `path` is either a filename or an absolute path.
   if likely path.len > 1 and path.isAbsolute: # Doesn't strip `./`
     let lastSlash = path.rfind(['/'], start = 1, last = path.high)
     if likely lastSlash.isSome: path[lastSlash.unsafeGet + 1..path.high]

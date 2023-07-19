@@ -90,7 +90,7 @@ proc staticReadConfig(path: string): HashSet[string] {.compileTime.} =
 
 var found {.global.}: HashSet[string]
 proc getIgnored(): HashSet[string] {.inline.} =
-  const defaultIgnored = staticReadConfig(currentSourcePath() /../ "ignore.csv")
+  const defaultIgnored = staticReadConfig(currentSourcePath.parentDir() / "ignore.csv")
   var tried {.global.} = false
   if not tried:
     tried = true

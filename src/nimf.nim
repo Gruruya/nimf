@@ -5,7 +5,7 @@
 ## The CLI interface for nimf
 import ./nimf/[find, findFiles, color, handling],
        pkg/[cligen, cligen/argcvt],
-       std/[paths, exitprocs]
+       std/[paths, exitprocs, macros]
 import std/os except getCurrentDir
 from   std/terminal import isatty, resetAttributes
 from   std/strutils import startsWith, toLowerAscii
@@ -87,8 +87,10 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
-  template traverse(andDo: RunOption): untyped =
-    traverseFind(paths, patterns, types, andDo)
+  macro traverse(andDo: RunOptionKind, args: varargs[typed]): untyped =
+    var behavior = quote: RunOption.init(`andDo`, follow_symlinks, all, exclude, max_depth, limit)
+    for a in args: behavior.add a
+    quote: traverseFind(paths, patterns, types, `behavior`)
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
@@ -101,16 +103,16 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
     if displayColor:
       exitprocs.addExitProc(resetAttributes)
       lscolors = parseLSColorsEnv()
-      discard traverse(RunOption.init(coloredPrint, follow_symlinks, all, exclude, max_depth, limit, null, hyperlink))
+      discard traverse(coloredPrint, null, hyperlink)
     else:
-      discard traverse(RunOption.init(plainPrint, follow_symlinks, all, exclude, max_depth, limit, null, hyperlink))
+      discard traverse(plainPrint, null, hyperlink)
 
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(RunOption.init(collect, follow_symlinks, all, exclude, max_depth, limit)))
+       run(execute, traverse(collect))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(RunOption.init(exec, follow_symlinks, all, exclude, max_depth, limit, cmds))
+      discard traverse(exec, cmds)
 
 #[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
