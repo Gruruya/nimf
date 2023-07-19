@@ -123,7 +123,7 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
       last = result[i][0] - 1
 
 proc filenameMatches(filename: string; pattern: openArray[char]): bool =
-  rfind(Path(filename), pattern, 0, filename.high, false).isSome
+  rfind(Path(filename), pattern, 0, filename.high, true).isSome
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   # `walkDir` which yields an object containing the `Stat` if the path was a link
