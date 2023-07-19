@@ -9,27 +9,50 @@ import std/[os, sets], ./find
 import std/[memfiles, streams]
 
 proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] {.inline.} =
-  iterator readSV(path: string; separators: char | set[char], eat: char | set[char] = {'\l'}): string =
-    template contains(x: char; y: char): bool = x == y
+  type chars = char | set[char]
+  iterator readSV(path: string; separators: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
+    ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
     var ms = newMemMapFileStream(path)
+    var afterComment = false
+    var stripStart = -1
     var s = newStringOfCap(16)
     while not ms.atEnd:
       var c = ms.readChar()
-      if c in separators:
-        yield s
-        s.setLen 0
-      elif c notin eat:
+      if afterComment:
+        if c in separators:
+          afterComment = false
+        continue
+      case c
+      of separators:
+        stripStart = -1
+        if s.len > 0: yield move(s)
+      of comment:
+        afterComment = true
+        if s.len > 0:
+          if stripStart == 0:
+            s.setLen 0
+            stripStart = -1
+          elif stripStart != -1:
+            s.setLen stripStart
+            stripStart = -1
+            yield move(s)
+          else:
+            yield move(s)
+      of strip:
+        if stripStart == -1: stripStart = s.len
         s.add move(c)
-    if s.len != 0:
-      yield s
+      else:
+        stripStart = -1
+        s.add move(c)
+    if s.len > 0:
+      yield move(s)
     ms.close()
-  template readCSV(path: string): string =
-    readSV(path, ',')
 
   result = static: initHashSet[string]()
-  for s in readCSV(path):
+  for s in readSV(path, {',', '\l'}):
     result.incl s
 
+var found {.global.}: HashSet[string]
 proc getIgnored(): HashSet[string] {.inline.} =
   const defaultIgnored =
     toHashSet([
@@ -40,8 +63,7 @@ proc getIgnored(): HashSet[string] {.inline.} =
     ])
 
   var tried {.global.} = false
-  var found {.global.}: HashSet[string]
-  if unlikely (not tried):
+  if not tried:
     tried = true
     try: result = readConfig(); found = result
     except: result = defaultIgnored
