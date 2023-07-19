@@ -231,7 +231,7 @@ proc f*() =
                     "\nOptions:\n$options",
            short = {"exclude": 'x', "types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
            help = {"all": "Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.",
-                   "exclude": "Add filenames to ignore.",
+                   "exclude": "Add filename patterns to ignore.",
                    "types": "Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
