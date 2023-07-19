@@ -78,12 +78,12 @@ iterator staticReadSV(path: string; separate: static[chars] = '\l'; comment: sta
   var i = -1
   readSVImpl((inc i; i <= file.high), file[i])
 
-proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] =
+proc readConfig(path = static joinPath(getConfigDir(), "nimf", "ignore.csv")): HashSet[string] =
   result = static: initHashSet[string]()
   for s in readSV(path, {',', '\l'}):
     result.incl s
 
-proc staticReadConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] {.compileTime.} =
+proc staticReadConfig(path: string): HashSet[string] {.compileTime.} =
   result = initHashSet[string]()
   for s in staticReadSV(path, {',', '\l'}):
     result.incl s
