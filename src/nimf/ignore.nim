@@ -2,15 +2,51 @@
 # Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-import std/sets, ./find
-from std/os import isAbsolute
+## Directories that are skipped when recursively searching (by default), feel free to add to this.
+## Count your directory sizes with `f -a -td -d1 -e 'echo $(f {} | wc -l) {}' | sort -n` in your home dir to find others to ignore.
 
-const ignoredDirs* = toHashSet([
-  ".git",
-  ".cache", "nimcache", "__pycache__",
-  "venv", "node_modules",
-  ".npm", ".cargo"
-  ])
+import std/[os, sets], ./find
+import std/[memfiles, streams]
+
+proc readConfig(path = static getConfigDir() / "nimf" / "ignore.csv"): HashSet[string] {.inline.} =
+  iterator readSV(path: string; separators: char | set[char], eat: char | set[char] = {'\l'}): string =
+    template contains(x: char; y: char): bool = x == y
+    var ms = newMemMapFileStream(path)
+    var s = newStringOfCap(16)
+    while not ms.atEnd:
+      var c = ms.readChar()
+      if c in separators:
+        yield s
+        s.setLen 0
+      elif c notin eat:
+        s.add move(c)
+    if s.len != 0:
+      yield s
+    ms.close()
+  template readCSV(path: string): string =
+    readSV(path, ',')
+
+  result = static: initHashSet[string]()
+  for s in readCSV(path):
+    result.incl s
+
+proc getIgnored(): HashSet[string] {.inline.} =
+  const defaultIgnored =
+    toHashSet([
+      ".git",
+      ".cache", "nimcache", "__pycache__",
+      "venv", "node_modules",
+      ".npm", ".rustup", ".cargo"
+    ])
+
+  var tried {.global.} = false
+  var found {.global.}: HashSet[string]
+  if not tried:
+    tried = true
+    try: result = readConfig(); found = result
+    except: result = defaultIgnored
+  elif found.len > 0: result = found
+  else: result = defaultIgnored
 
 func filename(path: string): string {.inline.} =
   if path.len > 1 and path.isAbsolute: # Doesn't strip `./`
@@ -19,5 +55,5 @@ func filename(path: string): string {.inline.} =
     else: path[1 .. ^1]
   else: path
 
-func ignoreDir*(dir: string): bool {.inline.} =
-  dir.filename in ignoredDirs
+proc ignoreDir*(dir: string): bool {.inline.} =
+  {.gcsafe.}: dir.filename in getIgnored()
