@@ -36,6 +36,17 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
+from pkg/malebolgia {.all.} import globalStopToken, cancel
+from std/atomics import store
+template ctrlC(body: untyped): proc() {.noconv.} =
+  proc() {.noconv.} =
+    globalStopToken.store(true)
+    findMaster.cancel()
+    body
+    stdout.write ansiResetCode # Clear style
+    stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
+    quit(128 + 2)
+
 proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); max_depth = 0; limit=0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
@@ -83,12 +94,17 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
     let displayColor = color.toBool(auto = toatty and getEnv("NO_COLOR").len == 0, contra = toatty and getEnv("NO_COLOR").len != 0)
     let hyperlink = hyperlink.toBool(auto = toatty)
+
+    if hyperlink: setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; stdout.write ansiResetCode)
+    elif displayColor: setControlCHook(ctrlC do: stdout.write ansiResetCode)
+
     if displayColor:
-      lscolors = parseLSColorsEnv()
       exitprocs.addExitProc(resetAttributes)
+      lscolors = parseLSColorsEnv()
       discard traverse(RunOption.init(coloredPrint, follow_symlinks, all, max_depth, limit, null, hyperlink))
     else:
       discard traverse(RunOption.init(plainPrint, follow_symlinks, all, max_depth, limit, null, hyperlink))
+
   else:
     if anyIt(execute, it.endsWith("+")):
       run(execute, traverse(RunOption.init(collect, follow_symlinks, all, max_depth, limit)))
@@ -201,18 +217,6 @@ func argHelp*(dfl: set[PathComponent], a: var ArgcvtParams): seq[string]=
     for d in dfl: dflSeq.add($d)
   argAggHelp(dflSeq, "set", typ, df)
   result = @[ a.argKeys, typ, df ]
-
-from pkg/malebolgia {.all.} import globalStopToken, cancel
-from std/atomics import store
-proc ctrlc() {.noconv.} =
-  globalStopToken.store(true)
-  findMaster.cancel()
-  stdout.write "\e]8;;\e\\"  # Close hyperlinks
-  stdout.write ansiResetCode # Clear style
-  stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
-  quit(128 + 2)
-
-setControlCHook(ctrlc)
 
 proc f*() =
   const nimbleFile = staticRead(currentSourcePath().parentDir.parentDir / "nimf.nimble")
