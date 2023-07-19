@@ -4,7 +4,7 @@
 
 ## Directories that are skipped when recursively searching (by default), feel free to add to this.
 
-import std/[os, sets, memfiles, streams], ./find
+import std/[os, sets, memfiles, streams], ./common
 
 template readSVImpl(condition: bool, getChar: char): untyped =
   var afterComment = false
@@ -97,13 +97,6 @@ proc getIgnored(): HashSet[string] {.inline.} =
     try: result = readConfig(); found = result
     except: result = defaultIgnored
   else: result = if found.len > 0: found else: defaultIgnored
-
-func filename(path: string): string {.inline.} =
-  if likely path.len > 1 and path.isAbsolute: # Doesn't strip `./`
-    let lastSlash = path.rfind(['/'], start = 1, last = path.high)
-    if likely lastSlash.isSome: path[lastSlash.unsafeGet + 1..path.high]
-    else: path[1 .. ^1]
-  else: path
 
 proc ignoreDir*(dir: string): bool {.inline.} =
   {.gcsafe.}: dir.filename in getIgnored()

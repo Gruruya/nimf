@@ -125,6 +125,9 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
 proc filenameMatches(filename: string; pattern: openArray[char]): bool =
   rfind(Path(filename), pattern, 0, filename.high, true).isSome
 
+template filenameMatches(filename: Path; pattern: openArray[char]): bool =
+  filenameMatches(filename.string, pattern)
+
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   # `walkDir` which yields an object containing the `Stat` if the path was a link
   var d = opendir(dir)
@@ -239,7 +242,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
       if descendent.kind == pcDir: path & '/'
       else: path
 
-    template format(path: string): Path =
+    template absolute(path: string): Path =
       (if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
        else: dir / Path(path)).trailingSlash
 
@@ -263,12 +266,14 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
 
     if behavior.exclude.len != 0:
       (var found = false; for pattern in behavior.exclude:
-         if filenameMatches(descendent.path, pattern): (found = true; break)
+         if pattern.find(['/'], 1, pattern.high - 1).isSome:
+           if filenameMatches(absolute(descendent.path), pattern): (found = true; break)
+         elif filenameMatches(filename(descendent.path), pattern): (found = true; break)
        if found: continue)
 
     if descendent.kind == pcDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
-      let path = format(descendent.path)
+      let path = absolute(descendent.path)
       if behavior.followSymlinks:
         let absPath = absolutePath(path, behavior.cwd)
         if findings.seenOrIncl absPath: continue
@@ -279,7 +284,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
 
     elif behavior.followSymlinks and descendent.kind == pcLinkToDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
-      let path = format(descendent.path)
+      let path = absolute(descendent.path)
       var resolved = try: dir / Path(expandSymlink(path.string)) except: continue
       if resolved == Path("/"): continue # Special case this
       if resolved.string[^1] != '/': resolved &= '/'
@@ -291,7 +296,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
         match(path)
 
     elif descendent.kind in kinds:
-      let path = format(descendent.path)
+      let path = absolute(descendent.path)
       match(path)
 
   if behavior.kind == coloredPrint:
