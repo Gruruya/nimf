@@ -95,8 +95,8 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
     let displayColor = color.toBool(auto = toatty and getEnv("NO_COLOR").len == 0, contra = toatty and getEnv("NO_COLOR").len != 0)
     let hyperlink = hyperlink.toBool(auto = toatty)
 
-    if hyperlink: setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; stdout.write ansiResetCode)
-    elif displayColor: setControlCHook(ctrlC do: stdout.write ansiResetCode)
+    if hyperlink: setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; resetAttributes())
+    elif displayColor: setControlCHook(ctrlC do: resetAttributes())
 
     if displayColor:
       exitprocs.addExitProc(resetAttributes)
