@@ -3,10 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 ## Directories that are skipped when recursively searching (by default), feel free to add to this.
-## Count your directory sizes with `f -a -td -d1 -e 'echo $(f {} | wc -l) {}' | sort -n` in your home dir to find others to ignore.
 
-import std/[os, sets], ./find
-import std/[memfiles, streams]
+import std/[os, sets, memfiles, streams], ./find
 
 template readSVImpl(condition: bool, getChar: char): untyped =
   var afterComment = false
@@ -91,7 +89,6 @@ proc staticReadConfig(path: string): HashSet[string] {.compileTime.} =
 var found {.global.}: HashSet[string]
 proc getIgnored(): HashSet[string] {.inline.} =
   const defaultIgnored = staticReadConfig(currentSourcePath() /../ "ignore.csv")
-
   var tried {.global.} = false
   if not tried:
     tried = true
