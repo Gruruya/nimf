@@ -95,7 +95,7 @@ func rfind(path: Path, pattern: openArray[char]; start, last: Natural; sensitive
     if ret.isSome: return ret
   result = none (Natural, Natural)
 
-proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
+proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(int, int)] =
   ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
   if patterns.len == 0: return @[]
   result = newSeq[(int, int)](patterns.len)
@@ -110,8 +110,6 @@ proc findPath*(path: Path; patterns: openArray[string]): seq[(int, int)] =
     else: path.string.rfind("/", last = path.string.high - 1).get(0)
 
   var last = path.string.high
-  let sensitive = patterns.containsAny({'A'..'Z'})
-
   for i in countdown(patterns.high, patterns.low):
     if last < 0: return @[]
     if patterns[i].len == 0:
@@ -229,7 +227,7 @@ proc notFoundPrint() =
 
 {.pop inline.}
 
-proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
+proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensitive: bool; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
   if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
@@ -249,7 +247,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
 
     template match(path: Path) =
       if m.cancelled: return
-      let found = path.findPath(patterns)
+      let found = path.findPath(patterns, sensitive)
       if found.len > 0:
         wasFound(path, found)
       elif behavior.kind in {plainPrint, coloredPrint}:
@@ -267,7 +265,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
         let absPath = absolutePath(path, behavior.cwd)
         if findings.seenOrIncl absPath: continue
       if behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth:
-        m.spawn findDirRec(m, path, patterns, kinds, behavior, depth + 1)
+        m.spawn findDirRec(m, path, patterns, sensitive, kinds, behavior, depth + 1)
       if pcDir in kinds:
         match(path)
 
@@ -279,7 +277,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       if resolved.string[^1] != '/': resolved &= '/'
       let absResolved = absolutePath(resolved, behavior.cwd)
       if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
-        m.spawn findDirRec(m, resolved, patterns, kinds, behavior, depth + 1)
+        m.spawn findDirRec(m, resolved, patterns, sensitive, kinds, behavior, depth + 1)
 
       if pcLinkToDir in kinds:
         match(path)
@@ -297,14 +295,15 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
 
 var findMaster* = createMaster()
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; behavior: sink RunOption): seq[Found] =
+  let sensitive = patterns.containsAny({'A'..'Z'})
   findMaster.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
       if info.kind == pcDir:
-        findMaster.spawn findDirRec(getHandle findMaster, path, patterns, kinds, behavior, 1)
+        findMaster.spawn findDirRec(getHandle findMaster, path, patterns, sensitive, kinds, behavior, 1)
 
       elif info.kind in kinds:
-        let found = path.findPath(patterns)
+        let found = path.findPath(patterns, sensitive)
         if found.len > 0:
           if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
           template getFound: Found =
