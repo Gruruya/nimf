@@ -230,7 +230,7 @@ proc f*() =
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
            short = {"types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
-           help = {"all": "Search all directories, normally a few choice directories are skipped.",
+           help = {"all": "Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.",
                    "types": "Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
