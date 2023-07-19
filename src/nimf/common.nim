@@ -41,7 +41,7 @@ template getIt*[T, R](self: Option[T], callback: untyped; otherwise: R): R =
   else:
     otherwise
 
-func filename*(path: string): string {.inline.} =
+template filename*(path: string): string =
   if likely path.len > 1 and path.isAbsolute: # Doesn't strip `./`
     let lastSlash = path.rfind(['/'], start = 1, last = path.high)
     if likely lastSlash.isSome: path[lastSlash.unsafeGet + 1..path.high]

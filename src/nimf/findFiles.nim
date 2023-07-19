@@ -8,8 +8,9 @@ import ./[common, find, handling, ignore], std/[paths, locks, atomics, posix, se
 import std/os except getCurrentDir
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
-proc len(p: Path): int {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
+proc high(p: Path): int {.inline, borrow.}
+proc len(p: Path): int {.inline, borrow.}
 proc hash(x: Path): Hash {.inline, borrow.}
 
 type
@@ -84,7 +85,7 @@ func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive:
 
   if substr.len == 1:
     if path.string[last] == substr[0]: return some (last, last) else: return
-  if last == path.string.high and substr[^1] == '/' and path.string[^1] != '/':
+  if last == path.high and substr[^1] == '/' and path.string[^1] != '/':
     redirect(subEnd = substr.high - 1)
   elif last == substr.high and substr[0] == '/' and path.string[0] != '/':
     redirect(last - 1, subStart = substr.low + 1)
@@ -108,9 +109,9 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
       break
   let lastSep =
     if path.len == 1: 0
-    else: path.string.rfind("/", last = path.string.high - 1).get(0)
+    else: path.string.rfind("/", last = path.high - 1).get(0)
 
-  var last = path.string.high
+  var last = path.high
   for i in countdown(patterns.high, patterns.low):
     if last < 0: return @[]
     if patterns[i].len == 0:
@@ -122,11 +123,11 @@ proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(i
       result[i] = found.unsafeGet
       last = result[i][0] - 1
 
-proc filenameMatches(filename: string; pattern: openArray[char]): bool =
-  rfind(Path(filename), pattern, pattern.high, filename.high, true).isSome
+func pathMatches(path: Path; pattern: openArray[char]): bool {.inline.} =
+  rfind(path, pattern, pattern.high, path.high, true).isSome
 
-template filenameMatches(filename: Path; pattern: openArray[char]): bool =
-  filenameMatches(filename.string, pattern)
+template pathMatches(path: string; pattern: openArray[char]): bool =
+  pathMatches(Path(path), pattern)
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   # `walkDir` which yields an object containing the `Stat` if the path was a link
@@ -267,8 +268,8 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
     if behavior.exclude.len != 0:
       (var found = false; for x in behavior.exclude:
          if x.fullmatch:
-           if filenameMatches(absolutePath(Path descendent.path, cwd), x.pattern): (found = true; break)
-         elif filenameMatches(filename(descendent.path), x.pattern): (found = true; break)
+           if pathMatches(absolutePath(Path descendent.path, cwd), x.pattern): (found = true; break)
+         elif pathMatches(filename(descendent.path), x.pattern): (found = true; break)
        if found: continue)
 
     if descendent.kind == pcDir:
