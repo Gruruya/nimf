@@ -238,13 +238,13 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
   if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
 
   template loop: untyped =
-    template trailingSlash(path: Path): Path =
-      if descendent.kind == pcDir: path & '/'
-      else: path
-
     template absolute(path: string): Path =
       (if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
-       else: dir / Path(path)).trailingSlash
+       else: dir / Path(path))
+
+    template format(path: string): Path =
+      if descendent.kind == pcLinkToDir: absolute(path) & '/'
+      else: absolute(path)
 
     template wasFound(path: Path; found: seq[(int, int)]) =
       if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
@@ -273,7 +273,7 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
 
     if descendent.kind == pcDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
-      let path = absolute(descendent.path)
+      let path = absolute(descendent.path) & '/'
       if behavior.followSymlinks:
         let absPath = absolutePath(path, behavior.cwd)
         if findings.seenOrIncl absPath: continue
@@ -293,10 +293,10 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; sensiti
         m.spawn findDirRec(m, resolved, patterns, sensitive, kinds, behavior, depth + 1)
 
       if pcLinkToDir in kinds:
-        match(path)
+        match(path & '/')
 
     elif descendent.kind in kinds:
-      let path = absolute(descendent.path)
+      let path = format(descendent.path)
       match(path)
 
   if behavior.kind == coloredPrint:
