@@ -255,6 +255,11 @@ proc findDirRec(m: MasterHandle; dir: Path; patterns: openArray[string]; kinds: 
       elif behavior.kind in {plainPrint, coloredPrint}:
         notFoundPrint()
 
+    if behavior.exclude.len != 0:
+      (var found = false; for pattern in behavior.exclude:
+        if descendent.path.find(pattern).isSome: found = true; break
+      if found: continue)
+
     if descendent.kind == pcDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = format(descendent.path) & '/'

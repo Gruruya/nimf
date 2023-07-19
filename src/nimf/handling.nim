@@ -31,6 +31,7 @@ type
 
   RunOption* = object
     searchAll*: bool
+    exclude*: seq[string]
     maxDepth* = 0
     maxFound* = 0
 
@@ -51,19 +52,19 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int): T {.inline.} =
-  result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
+proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int): T {.inline.} =
+  result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, exclude: exclude, maxDepth: maxDepth, maxFound: maxFound)
   if followSymlinks:
     result.cwd = paths.getCurrentDir()
 
-proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
+proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
   assert kind == exec
-  result = RunOption.init(kind, followSymlinks, searchAll, maxDepth, maxFound)
+  result = RunOption.init(kind, followSymlinks, searchAll, exclude, maxDepth, maxFound)
   result.cmds = cmds
 
-proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
+proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
   assert kind in {plainPrint, coloredPrint}
-  result = RunOption.init(kind, followSymlinks, searchAll, maxDepth, maxFound)
+  result = RunOption.init(kind, followSymlinks, searchAll, exclude, maxDepth, maxFound)
   result.null = null
   {.cast(uncheckedAssign).}:
     result.hyperlink = hyperlink

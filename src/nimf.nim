@@ -47,7 +47,7 @@ template ctrlC(body: untyped): proc() {.noconv.} =
     stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
     quit(128 + 2)
 
-proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); max_depth = 0; limit=0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); max_depth = 0; limit=0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -101,16 +101,16 @@ proc cliFind*(all = false; types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; e
     if displayColor:
       exitprocs.addExitProc(resetAttributes)
       lscolors = parseLSColorsEnv()
-      discard traverse(RunOption.init(coloredPrint, follow_symlinks, all, max_depth, limit, null, hyperlink))
+      discard traverse(RunOption.init(coloredPrint, follow_symlinks, all, exclude, max_depth, limit, null, hyperlink))
     else:
-      discard traverse(RunOption.init(plainPrint, follow_symlinks, all, max_depth, limit, null, hyperlink))
+      discard traverse(RunOption.init(plainPrint, follow_symlinks, all, exclude, max_depth, limit, null, hyperlink))
 
   else:
     if anyIt(execute, it.endsWith("+")):
-      run(execute, traverse(RunOption.init(collect, follow_symlinks, all, max_depth, limit)))
+      run(execute, traverse(RunOption.init(collect, follow_symlinks, all, exclude, max_depth, limit)))
     else:
       let cmds = execute.mapIt(Command.init(it))
-      discard traverse(RunOption.init(exec, follow_symlinks, all, max_depth, limit, cmds))
+      discard traverse(RunOption.init(exec, follow_symlinks, all, exclude, max_depth, limit, cmds))
 
 #[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
@@ -229,8 +229,9 @@ proc f*() =
                     "Entered `input` may be a pattern OR a path to search.\n" &
                     "The pattern will only match with the filename unless you include a `/`.\n" &
                     "\nOptions:\n$options",
-           short = {"types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
+           short = {"exclude": 'x', "types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
            help = {"all": "Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.",
+                   "exclude": "Add filenames to ignore.",
                    "types": "Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
