@@ -16,6 +16,14 @@ template readSVImpl(condition: bool, getChar: char): untyped =
       if c in separate:
         afterComment = false
       continue
+
+    template ymove(s: var string): untyped =
+      when nimvm:
+        yield s
+        s.setLen 0
+      else:
+        yield move(s)
+
     template checkEscaped: untyped =
       if s.len > 0:
         if s[^1] == '\\':
@@ -28,12 +36,6 @@ template readSVImpl(condition: bool, getChar: char): untyped =
               stripStart = -1
               s.add c
               continue
-    template ymove(s: var string): untyped =
-      when nimvm:
-        yield s
-        s.setLen 0
-      else:
-        yield move(s)
     case c
     of separate:
       checkEscaped()
@@ -76,7 +78,7 @@ iterator staticReadSV(path: string; separate: static[chars] = '\l'; comment: sta
   var i = -1
   readSVImpl((inc i; i <= file.high), file[i])
 
-proc readConfig(path = static joinPath(getConfigDir(), "nimf", "ignore.csv")): HashSet[string] =
+proc readConfig(path = static joinPath(getConfigDir(), "nimf", "ignore.csv")): HashSet[string] {.inline.} =
   result = static: initHashSet[string]()
   for s in readSV(path, {',', '\l'}):
     result.incl s
