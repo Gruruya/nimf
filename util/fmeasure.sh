@@ -13,6 +13,11 @@ end_s=${end%.*}
 start_ns=$(printf "%.0f" ${start#*.})
 end_ns=$(printf "%.0f" ${end#*.})
 
+if [ "$end_ns" -lt "$start_ns" ]; then
+  end_s=$((end_s - 1))
+  end_ns=$((end_ns + 1000000000))
+fi
+
 duration_s=$((end_s - start_s))
 duration_ms=$(( (end_ns - start_ns) / 1000000 ))
 duration_ns=$(( (end_ns - start_ns) % 1000000 ))
