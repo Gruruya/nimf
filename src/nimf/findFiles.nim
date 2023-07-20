@@ -208,7 +208,7 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
 
   {.gcsafe.}:
     if numPrinted < 8192:
-      stdout.write line(); stdout.flushFile()
+      stdout.write line; stdout.flushFile()
       inc numPrinted
     else:
       acquire(printLock)

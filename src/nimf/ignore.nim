@@ -13,8 +13,10 @@ template readSVImpl(condition: bool, getChar: char): untyped =
   while condition:
     var c = getChar
     if afterComment:
-      if c in separate:
+      case c
+      of separator, lineSeparator:
         afterComment = false
+      else: discard
       continue
 
     template ymove(s: var string): untyped =
@@ -36,15 +38,8 @@ template readSVImpl(condition: bool, getChar: char): untyped =
               stripStart = -1
               s.add c
               continue
-    case c
-    of separate:
-      checkEscaped()
-      stripStart = -1
-      if s.len > 0:
-        ymove s
-    of comment:
-      checkEscaped()
-      afterComment = true
+
+    template stripYield: untyped =
       if s.len > 0:
         if stripStart == 0:
           s.setLen 0
@@ -55,6 +50,20 @@ template readSVImpl(condition: bool, getChar: char): untyped =
           ymove s
         else:
           ymove s
+
+    case c
+    of separator:
+      checkEscaped()
+      stripStart = -1
+      if s.len > 0:
+        ymove s
+    of lineSeparator:
+      checkEscaped()
+      stripYield()
+    of comment:
+      checkEscaped()
+      afterComment = true
+      stripYield()
     of strip:
       if stripStart == -1: stripStart = s.len
       s.add c
@@ -66,13 +75,13 @@ template readSVImpl(condition: bool, getChar: char): untyped =
 
 type chars = char | set[char]
 
-iterator readSV(path: string; separate: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
+iterator readSV(path: string; separator: static[chars]; lineSeparator: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
   ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
   var ms = newMemMapFileStream(path)
   readSVImpl(not ms.atEnd, ms.readChar())
   ms.close()
 
-iterator staticReadSV(path: string; separate: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
+iterator staticReadSV(path: string; separator: static[chars]; lineSeparator: static[chars] = '\l'; comment: static[chars] = '#'; strip: static[chars] = ' '): string =
   ## CSV/TSV reader, allows comments (The line `elem,elem2 # This is a comment` is valid)
   var file = staticRead(path)
   var i = -1
@@ -80,12 +89,12 @@ iterator staticReadSV(path: string; separate: static[chars] = '\l'; comment: sta
 
 proc readConfig(path = static joinPath(getConfigDir(), "nimf", "ignore.csv")): HashSet[string] {.inline.} =
   result = static: initHashSet[string]()
-  for s in readSV(path, {',', '\l'}):
+  for s in readSV(path, ','):
     result.incl s
 
 proc staticReadConfig(path: string): HashSet[string] {.compileTime.} =
   result = initHashSet[string]()
-  for s in staticReadSV(path, {',', '\l'}):
+  for s in staticReadSV(path, ','):
     result.incl s
 
 var found {.global.}: HashSet[string]
