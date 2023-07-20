@@ -98,7 +98,6 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
 
     if hyperlink:
       setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; stdout.resetAttributes())
-      exitprocs.addExitProc(proc() = stdout.write "\e]8;;\e\\")
     elif displayColor:
       setControlCHook(ctrlC do: stdout.resetAttributes())
 
