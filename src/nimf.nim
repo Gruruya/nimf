@@ -43,7 +43,6 @@ template ctrlC(body: untyped): proc() {.noconv.} =
     globalStopToken.store(true)
     findMaster.cancel()
     body
-    stdout.write ansiResetCode # Clear style
     stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
     quit(128 + 2)
 
@@ -97,8 +96,11 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
     let displayColor = color.toBool(auto = toatty and getEnv("NO_COLOR").len == 0, contra = toatty and getEnv("NO_COLOR").len != 0)
     let hyperlink = hyperlink.toBool(auto = toatty)
 
-    if hyperlink: setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; resetAttributes())
-    elif displayColor: setControlCHook(ctrlC do: resetAttributes())
+    if hyperlink:
+      setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; stdout.resetAttributes())
+      exitprocs.addExitProc(proc() = stdout.write "\e]8;;\e\\")
+    elif displayColor:
+      setControlCHook(ctrlC do: stdout.resetAttributes())
 
     if displayColor:
       exitprocs.addExitProc(resetAttributes)

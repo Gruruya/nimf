@@ -192,14 +192,14 @@ var numFound: Atomic[int]
 
 {.push inline.}
 
-func wrapHyperlink(path: Path, prefix: string, encodedCwd: string, display = path.string): string =
-  result = prefix
+func wrapHyperlink(path: Path, hyperlinkPrefix: string, encodedCwd: string, display = path.string): string =
+  result = hyperlinkPrefix
   if not path.isAbsolute:
     result.add encodedCwd
   result.add encodeHyperlink(path.string)
   result.add "\e\\"
   result.add display
-  result.add "\e]8;;\e\\"
+  when false: result.add "\e]8;;\e\\" # Don't need to close each tag, closes on finished/exit
 
 proc print(path: Path; behavior: RunOption; display = path.string) =
   template line: string =
