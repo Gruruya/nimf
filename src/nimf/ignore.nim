@@ -39,16 +39,15 @@ template readSVImpl(condition: bool, getChar: char): untyped =
               continue
 
     template stripYield: untyped =
-      if s.len > 0:
-        if stripStart == 0:
-          s.setLen 0
-          stripStart = -1
-        elif stripStart != -1:
-          s.setLen stripStart
-          stripStart = -1
-          ymove s
-        else:
-          ymove s
+      if stripStart == 0:
+        s.setLen 0
+        stripStart = -1
+      elif stripStart != -1:
+        s.setLen stripStart
+        stripStart = -1
+        ymove s
+      else:
+        ymove s
 
     case c
     of separator:
@@ -58,11 +57,13 @@ template readSVImpl(condition: bool, getChar: char): untyped =
         ymove s
     of lineSeparator:
       checkEscaped()
-      stripYield()
+      if s.len > 0:
+        stripYield()
     of comment:
       checkEscaped()
       afterComment = true
-      stripYield()
+      if s.len > 0:
+        stripYield()
     of strip:
       if stripStart == -1: stripStart = s.len
       s.add c
