@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 # Count your directory sizes with `f -tdi -d1 -e 'echo $(f {} | wc -l) {}' | sort -n` to find others to ignore.
-# Drop the `-d1` to recurse.
+# Drop the `-d1` to recurse. See `util/fmeasure.sh` to time crawling.
 
 # general
 .git,
