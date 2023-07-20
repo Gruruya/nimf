@@ -199,7 +199,7 @@ func wrapHyperlink(path: Path, hyperlinkPrefix: string, encodedCwd: string, disp
   result.add encodeHyperlink(path.string)
   result.add "\e\\"
   result.add display
-  result.add "\e]8;;\e\\"
+  when false: result.add "\e]8;;\e\\" # Hyperlinks are closed on exit
 
 proc print(path: Path; behavior: RunOption; display = path.string) =
   template line: string =

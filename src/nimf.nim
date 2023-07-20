@@ -98,11 +98,12 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
 
     if hyperlink:
       setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; stdout.resetAttributes())
+      exitprocs.addExitProc(proc = stderr.write "\e]8;;\e\\"; stdout.write "\e]8;;\e\\")
     elif displayColor:
       setControlCHook(ctrlC do: stdout.resetAttributes())
 
     if displayColor:
-      exitprocs.addExitProc(resetAttributes)
+      exitprocs.addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
       lscolors = parseLSColorsEnv()
       discard traverse(coloredPrint, null, hyperlink)
     else:
