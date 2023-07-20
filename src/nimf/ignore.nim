@@ -7,16 +7,15 @@
 import std/[os, sets, memfiles, streams], ./common
 
 template readSVImpl(condition: bool, getChar: char): untyped =
+  template contains(x: char, y: char): bool = x == y
   var afterComment = false
   var stripStart = -1
   var s = newStringOfCap(16)
   while condition:
     var c = getChar
     if afterComment:
-      case c
-      of separator, lineSeparator:
+      if c in lineSeparator:
         afterComment = false
-      else: discard
       continue
 
     template ymove(s: var string): untyped =
