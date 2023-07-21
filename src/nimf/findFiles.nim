@@ -232,6 +232,19 @@ proc notFoundPrint() =
         stdout.flushFile()
         numFailed = 0
 
+template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
+  if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
+  case behavior.action
+  of plainPrint:
+    print(path, behavior)
+  of coloredPrint: ({.gcsafe.}:
+    print(path, behavior, color(found, patterns)))
+  of collect:
+    findings.add(found)
+  of exec:
+    run(m, behavior.cmds, found)
+
+
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; sensitive: bool; kinds: set[PathComponent]; behavior: RunOption; depth: Positive) {.gcsafe.} =
@@ -247,14 +260,7 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
       else: relPath(path)
 
     template wasFound(path: Path; found: seq[(int, int)]) =
-      if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
-      case behavior.action
-      of plainPrint:
-        print(path, behavior)
-      of coloredPrint:
-        print(path, behavior, ({.gcsafe.}: color(descendent.toFound(path, matches = found), patterns)))
-      of collect: findings.add descendent.toFound(path, matches = found)
-      of exec: run(m, behavior.cmds, descendent.toFound(path, matches = found))
+      m.runFound(behavior, path, descendent.toFound(path, matches = found), patterns)
 
     template match(path: Path) =
       if m.cancelled: return
@@ -322,18 +328,10 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
           if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
           template getFound: Found =
             if behavior.action == coloredPrint and info.kind == pcLinkToFile:
-                var s: Stat
-                let broken = stat(cstring path.string, s) < 0'i32
+                var s: Stat; let broken = stat(cstring path.string, s) < 0'i32
                 Found(path: path, kind: pcLinkToFile, matches: found, broken: broken)
             else: Found(path: path, kind: info.kind, matches: found)
-
-          case behavior.action
-          of plainPrint:
-            print(path, behavior)
-          of coloredPrint:
-            print(path, behavior, color(getFound(), patterns))
-          of collect: findings.add getFound()
-          of exec: run(findMaster.getHandle, behavior.cmds, getFound())
+          getHandle(findMaster).runFound(behavior, path, getFound(), patterns)
         elif behavior.action in {plainPrint, coloredPrint}:
           notFoundPrint()
 
