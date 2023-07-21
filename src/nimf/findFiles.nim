@@ -130,7 +130,7 @@ template pathMatches(path: string; pattern: openArray[char]): bool =
   pathMatches(Path(path), pattern)
 
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
-  # `walkDir` which yields an object containing the `Stat` if the path was a link
+  # `walkDir` which yields an object also containing what was read from `Stat`
   var d = opendir(dir)
   if d == nil:
     if checkDir:
@@ -179,7 +179,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
               kSetGeneric()
             else: # DT_REG or special "files" like FIFOs
               discard
-          else:  # assuming that field `d_type` is not present
+          else:   # assuming that field `d_type` is not present
             kSetGeneric()
 
         yield result
@@ -205,7 +205,6 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
   template line: string =
     (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
      else: display) & (if behavior.null: '\0' else: '\n')
-
   {.gcsafe.}:
     if numPrinted < 8192:
       stdout.write line; stdout.flushFile()
@@ -249,7 +248,7 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
 
     template wasFound(path: Path; found: seq[(int, int)]) =
       if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
-      case behavior.kind
+      case behavior.action
       of plainPrint:
         print(path, behavior)
       of coloredPrint:
@@ -262,7 +261,7 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
       let found = path.findPath(patterns, sensitive)
       if found.len > 0:
         wasFound(path, found)
-      elif behavior.kind in {plainPrint, coloredPrint}:
+      elif behavior.action in {plainPrint, coloredPrint}:
         notFoundPrint()
 
     if behavior.exclude.len != 0:
@@ -300,7 +299,7 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
       let path = format(descendent.path)
       match(path)
 
-  if behavior.kind == coloredPrint:
+  if behavior.action == coloredPrint:
     for descendent in dir.string.walkDirStat(relative = not isAbsolute(dir)):
       loop()
   else:
@@ -322,32 +321,24 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; kinds = {pcFil
         if found.len > 0:
           if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
           template getFound: Found =
-            if behavior.kind == coloredPrint:
-              case info.kind
-              of pcFile:
-                var s: Stat
-                if lstat(cstring path.string, s) < 0'i32: continue
-                Found(path: path, kind: pcFile, matches: found, stat: some s)
-              of pcLinkToFile:
+            if behavior.action == coloredPrint and info.kind == pcLinkToFile:
                 var s: Stat
                 let broken = stat(cstring path.string, s) < 0'i32
                 Found(path: path, kind: pcLinkToFile, matches: found, broken: broken)
-              else:
-                Found(path: path, kind: info.kind, matches: found)
             else: Found(path: path, kind: info.kind, matches: found)
 
-          case behavior.kind
+          case behavior.action
           of plainPrint:
             print(path, behavior)
           of coloredPrint:
             print(path, behavior, color(getFound(), patterns))
           of collect: findings.add getFound()
           of exec: run(findMaster.getHandle, behavior.cmds, getFound())
-        elif behavior.kind in {plainPrint, coloredPrint}:
+        elif behavior.action in {plainPrint, coloredPrint}:
           notFoundPrint()
 
   if not cancelled(findMaster):
-    case behavior.kind
+    case behavior.action
     of plainPrint, coloredPrint:
       if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
     of collect: result &= findings.found.value

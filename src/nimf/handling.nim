@@ -26,7 +26,7 @@ type
     allIndexes*: seq[seq[Natural]]
     placements*: seq[(Natural, Natural)]
 
-  RunOptionKind* = enum
+  RunOptionAction* = enum
     plainPrint, coloredPrint, collect, exec
 
   RunOption* = object
@@ -36,7 +36,7 @@ type
     maxFound* = 0
     followSymlinks*: bool
 
-    case kind*: RunOptionKind
+    case action*: RunOptionAction
     of plainPrint, coloredPrint:
       null*: bool
       case hyperlink*: bool
@@ -48,19 +48,19 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int): T {.inline.} =
-  result = RunOption(kind: kind, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int): T {.inline.} =
+  result = RunOption(action: action, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
   for x in exclude:
     if x.len > 0: result.exclude.add (x, x.len > 1 and x.find(['/'], 1, x.high - 1).isSome)
 
-proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
-  assert kind == exec
-  result = RunOption.init(kind, followSymlinks, searchAll, exclude, maxDepth, maxFound)
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
+  assert action == exec
+  result = RunOption.init(action, followSymlinks, searchAll, exclude, maxDepth, maxFound)
   result.cmds = cmds
 
-proc init*(T: type RunOption; kind: RunOptionKind; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
-  assert kind in {plainPrint, coloredPrint}
-  result = RunOption.init(kind, followSymlinks, searchAll, exclude, maxDepth, maxFound)
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
+  assert action in {plainPrint, coloredPrint}
+  result = RunOption.init(action, followSymlinks, searchAll, exclude, maxDepth, maxFound)
   result.null = null
   {.cast(uncheckedAssign).}:
     result.hyperlink = hyperlink

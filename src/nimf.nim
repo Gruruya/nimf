@@ -86,7 +86,7 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
   if patterns.len == 0: patterns = @[""]
   if paths.len == 0: paths = @[Path(".")]
 
-  macro traverse(andDo: RunOptionKind, args: varargs[typed]): untyped =
+  macro traverse(andDo: RunOptionAction, args: varargs[typed]): untyped =
     var behavior = quote: RunOption.init(`andDo`, follow_symlinks, all, exclude, max_depth, limit)
     for a in args: behavior.add a
     quote: traverseFind(paths, patterns, types, `behavior`)
