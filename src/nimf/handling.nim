@@ -122,13 +122,13 @@ proc color*(found: Found, patterns: openArray[string]): string =
       let matchStart = found.matches[i][0]
       let matchEnd = found.matches[i][1]
 
-      if start > parentSep:
+      if parentSep < start:
         result.add fileColor, path[start ..< matchStart]
-      elif dirColor != fileColor and matchStart >= parentSep:
-        result.add dirColor, path[start .. parentSep - (if parentSep == matchStart: 1 else: 0)]
-        result.add fileColor, path[parentSep + 1 ..< matchStart]
-      else:
+      elif dirColor == fileColor or parentSep >= matchStart:
         result.add dirColor, path[start ..< matchStart]
+      else:
+        result.add dirColor, path[start .. parentSep]
+        result.add fileColor, path[parentSep + 1 ..< matchStart]
 
       result.add highlightColor, path[matchStart..matchEnd]
       start = matchEnd + 1
