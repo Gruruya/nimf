@@ -85,7 +85,9 @@ func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive:
 
   if substr.len == 1:
     if path.string[last] == substr[0]: return some (last, last) else: return
-  if last == substr.high and substr[0] == '/' and path.string[0] != '/':
+  if last == path.high and substr[^1] == '$' and path.string[^1] != '$':
+    redirect(subEnd = substr.high - 1)
+  elif last == substr.high and substr[0] == '/' and path.string[0] != '/':
     redirect(last - 1, subStart = substr.low + 1)
   else: redirect()
 
