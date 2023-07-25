@@ -262,7 +262,10 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
     template matchesExt(path: Path): bool =
       behavior.types.extensions.len == 0 or
         (let extPos = path.string.rfind(['.']); extPos.isSome) and
-        path.string[extPos.unsafeGet..^1] in behavior.types.extensions
+        (var has = false;
+        for ext in behavior.types.extensions:
+          if path.string.endsWith(ext): has = true; break
+        has)
 
     template match(path: Path) =
       if m.cancelled: return
