@@ -79,14 +79,15 @@ func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural
 
 func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
   ## preceedsWith but treats the beginning and end of the `text` the same as a `/` character
+  if substr.len == 1:
+    if path.string[last] == substr[0]: return some (last, last) else: return
+
   template redirect(last = last; subStart = substr.low; subEnd = substr.high): untyped =
     if sensitive: path.string.preceedsWith(substr, last, subStart, subEnd)
     else: path.string.preceedsWith(substr, last, subStart, subEnd, cmp = cmpInsensitive)
 
-  if substr.len == 1:
-    if path.string[last] == substr[0]: return some (last, last) else: return
   if last == path.high and substr[^1] == '$' and path.string[^1] != '$':
-    redirect(subEnd = substr.high - 1)
+    redirect(last = if path.string[^1] == '/': last - 1 else: last, subEnd = substr.high - 1)
   elif last == substr.high and substr[0] == '/' and path.string[0] != '/':
     redirect(last - 1, subStart = substr.low + 1)
   else: redirect()
