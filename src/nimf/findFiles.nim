@@ -6,6 +6,7 @@
 ## Posix only currently as it uses stat.
 import ./[common, find, handling, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
 import std/os except getCurrentDir
+from   std/sequtils import anyIt
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -271,11 +272,7 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
       m.runFound(behavior, path, descendent.toFound(path, matches = found), patterns)
 
     template matchesExt(path: Path): bool =
-      behavior.types.extensions.len == 0 or
-        (var has = false;
-        for ext in behavior.types.extensions:
-          if path.string.endsWith(ext): (has = true; break)
-        has)
+      behavior.types.extensions.len == 0 or anyIt(behavior.types.extensions, path.string.endsWith(it))
 
     template match(path: Path) =
       if m.cancelled: return
