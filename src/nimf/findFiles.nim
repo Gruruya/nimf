@@ -77,24 +77,27 @@ func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural
     if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return
   result = some (Natural(last - (subEnd - subStart)), last)
 
-func preceedsWith(path: Path, substr: openArray[char]; last: Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
-  ## preceedsWith but treats the beginning and end of the `text` the same as a `/` character
-  if substr.len == 1:
-    if path.string[last] == substr[0]: return some (last, last) else: return
+func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
+  if pattern.len == 1:
+    return (if path.string[last] == pattern[0]: some (last, last) else: none (Natural, Natural))
 
-  template redirect(last = last; subStart = substr.low; subEnd = substr.high): untyped =
-    if sensitive: path.string.preceedsWith(substr, last, subStart, subEnd)
-    else: path.string.preceedsWith(substr, last, subStart, subEnd, cmp = cmpInsensitive)
+  template preceedsWith(last = last; patStart = pattern.low; patEnd = pattern.high): untyped =
+    if sensitive: path.string.preceedsWith(pattern, last, patStart, patEnd)
+    else: path.string.preceedsWith(pattern, last, patStart, patEnd, cmp = cmpInsensitive)
 
-  if last == path.high and substr[^1] == '$' and path.string[^1] != '$':
-    redirect(last = if path.string[^1] == '/': last - 1 else: last, subEnd = substr.high - 1)
-  elif last == substr.high and substr[0] == '/' and path.string[0] != '/':
-    redirect(last - 1, subStart = substr.low + 1)
-  else: redirect()
+  if pattern[0] == '/' and path.string[0] != '/':
+    if pattern[^1] == '$' and path.string[^1] != '$':
+      let ret = preceedsWith(path.string.high - (if path.string[^1] == '/': 1 else: 0), pattern.low + 1, pattern.high - (if pattern[^2] == '/': 2 else: 1))
+      if ret.isSome: return ret
+    else:
+      let ret = preceedsWith(pattern.high - 1, patStart = 1)
+      if ret.isSome: return ret
+  elif pattern[^1] == '$' and path.string[^1] != '$':
+    let ret = preceedsWith(path.string.high - (if path.string[^1] == '/': 1 else: 0), patEnd = pattern.high - (if pattern[^2] == '/': 2 else: 1))
+    if ret.isSome: return ret
 
-func rfind(path: Path, pattern: openArray[char]; start, last: Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
   for i in countdown(last, start):
-    let ret = path.preceedsWith(pattern, i, sensitive)
+    let ret = preceedsWith(i)
     if ret.isSome: return ret
   result = none (Natural, Natural)
 
