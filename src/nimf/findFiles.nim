@@ -78,9 +78,6 @@ func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural
   result = some (Natural(last - (subEnd - subStart)), last)
 
 func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
-  if pattern.len == 1:
-    return (if path.string[last] == pattern[0]: some (last, last) else: none (Natural, Natural))
-
   template preceedsWith(last = last; patStart = pattern.low; patEnd = pattern.high): untyped =
     if sensitive: path.string.preceedsWith(pattern, last, patStart, patEnd)
     else: path.string.preceedsWith(pattern, last, patStart, patEnd, cmp = cmpInsensitive)
