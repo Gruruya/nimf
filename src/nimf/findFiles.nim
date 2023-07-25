@@ -82,28 +82,28 @@ func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sens
     if sensitive: path.string.preceedsWith(pattern, last, patStart, patEnd)
     else: path.string.preceedsWith(pattern, last, patStart, patEnd, cmp = cmpInsensitive)
 
+  template returnSome[T](o: Option[T]): untyped =
+    let ret = o
+    if ret.isSome: return ret
+
   # Special handling for / and $ as start and end of line
   if pattern.len > 1:
     if pattern[^1] == '$':
       let last = if path.string[last] == '/': last - 1 else: last
       let patEnd = pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1)
       if last - patEnd >= 0:
-        let ret = preceedsWith(last, 0, patEnd)
-        if ret.isSome: return ret
+        returnSome preceedsWith(last, 0, patEnd)
     if pattern[0] == '/' and path.string[0] != '/':
       let patStart = pattern.low + 1
       if pattern[^1] == '$': # $pattern/, check exact match
         let last = if path.string[last] == '/': last - 1 else: last
         let patEnd = pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1)
         if last == patEnd - patStart:
-          let ret = preceedsWith(last, patStart, patEnd)
-          if ret.isSome: return ret
-      let ret = preceedsWith(pattern.high - patStart, patStart, pattern.high)
-      if ret.isSome: return ret
+          returnSome preceedsWith(last, patStart, patEnd)
+      returnSome preceedsWith(pattern.high - patStart, patStart, pattern.high)
 
   for i in countdown(last, start):
-    let ret = preceedsWith(i)
-    if ret.isSome: return ret
+    returnSome preceedsWith(i)
   result = none (Natural, Natural)
 
 proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(int, int)] =
