@@ -67,13 +67,13 @@ var findings = Findings.init()
 
 func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`
-  for i in substr.low..subEnd - subStart:
+  for i in 0..subEnd - subStart:
     if text[last - (subEnd - subStart - i)] != substr[i + subStart]: return
   result = some (Natural(last - (subEnd - subStart)), last)
 
 func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural; cmp: proc): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`, custom comparison procedure variant
-  for i in substr.low..subEnd - subStart:
+  for i in 0..subEnd - subStart:
     if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return
   result = some (Natural(last - (subEnd - subStart)), last)
 
@@ -85,8 +85,11 @@ func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sens
   # Special handling for / and $ as start and end of line
   if pattern.len > 1:
     if pattern[^1] == '$':
-      let ret = preceedsWith(if path.string[last] == '/': last - 1 else: last, 0, pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1))
-      if ret.isSome: return ret
+      let last = if path.string[last] == '/': last - 1 else: last
+      let patEnd = pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1)
+      if last - patEnd >= 0:
+        let ret = preceedsWith(last, 0, patEnd)
+        if ret.isSome: return ret
     if pattern[0] == '/' and path.string[0] != '/':
       let patStart = pattern.low + 1
       if pattern[^1] == '$': # $pattern/, check exact match

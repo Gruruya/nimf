@@ -102,7 +102,9 @@ template add(x: var string, y: varargs[string]) =
 
 proc color*(found: Found, patterns: openArray[string]): string =
   template path: untyped = found.path.string
-  let parentSep = path.rfind("/", last = path.high - 1).getIt(it.int, -1)
+  let parentSep =
+    if path.len == 1: -1
+    else: path.rfind("/", last = path.high - 1).getIt(it.int, -1)
 
   let dirColor = lscolors.types.getOrDefault(etDirectory, ansiResetCode)
   let fileColor =
