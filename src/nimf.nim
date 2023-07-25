@@ -5,12 +5,14 @@
 ## The CLI interface for nimf
 import ./nimf/[find, findFiles, color, handling],
        pkg/[cligen, cligen/argcvt],
-       std/[paths, exitprocs, macros]
+       std/[paths, exitprocs, macros, sets]
 import std/os except getCurrentDir
 from   std/terminal import isatty, resetAttributes
 from   std/strutils import startsWith, toLowerAscii
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
+
+#TODO: Remove weird / begin/end handling and add -t/--type which is like all of find -options, except if the type isn't a recognized keyword (or starts with a .), it's treated as an extension.
 
 type
   Flag {.pure.} = enum
@@ -25,6 +27,14 @@ func toBool(flag: Flag; auto = true, contra = false, true: static bool = true, f
   of Flag.contra: contra
   of Flag.true: true
   of Flag.false: false
+
+func incl*(a: var FileTypes, b: FileTypes) =
+  a.kinds.incl b.kinds
+  a.extensions.incl b.extensions
+
+func excl*(a: var FileTypes, b: FileTypes) =
+  a.kinds.excl b.kinds
+  a.extensions.excl b.extensions
 
 func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
   ## Overwrites `x[i]` with `y`
@@ -46,7 +56,7 @@ template ctrlC(body: untyped): proc() {.noconv.} =
     stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
     quit(128 + 2)
 
-proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}; execute = newSeq[string](); max_depth = 0; limit=0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(all = false; exclude = newSeq[string](); types = FileTypes(); execute = newSeq[string](); max_depth = 0; limit=0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -87,9 +97,9 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = {pcFile, pcDir, p
   if paths.len == 0: paths = @[Path(".")]
 
   macro traverse(andDo: RunOptionAction, args: varargs[typed]): untyped =
-    var behavior = quote: RunOption.init(`andDo`, follow_symlinks, all, exclude, max_depth, limit)
+    var behavior = quote: RunOption.init(`andDo`, follow_symlinks, all, exclude, types, max_depth, limit)
     for a in args: behavior.add a
-    quote: traverseFind(paths, patterns, types, `behavior`)
+    quote: traverseFind(paths, patterns, `behavior`)
 
   if execute.len == 0:
     let toatty = stdout.isatty # We only write to stdout for explicit `yes` options
@@ -143,26 +153,24 @@ proc argHelp*(dfl: Flag; a: var ArgcvtParams): seq[string] =
     a.shortNoVal.incl(a.parSh[0]) # flag can elide option arguments.
   a.longNoVal.add(move(a.parNm))  # So, add to *NoVal.
 
-# For `-t=f`
-type FileKind = enum
-  file, directory, link, any, lfile, flink, ldirectory, dlink
-
-func to(filetype: FileKind, T: type set[PathComponent]): T =
-  case filetype
-  of file: {pcFile}
-  of directory: {pcDir}
-  of link: {pcLinkToFile, pcLinkToDir}
-  of lfile, flink: {pcLinkToFile}
-  of ldirectory, dlink: {pcLinkToDir}
-  of any: {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
-
-proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var ArgcvtParams): bool =
+proc argParse*(dst: var FileTypes, dfl: FileTypes, a: var ArgcvtParams): bool =
   ## Parse `set[PathComponent]` as a `set[FileKind]`
   var first = false; once: first = true
   result = true
   try:
-    proc argAggSplit(a: var ArgcvtParams, split=true): set[PathComponent] =
+    proc argAggSplit(a: var ArgcvtParams, split=true): FileTypes =
       ## Similar to `argAggSplit` but specialized for set[PathComponent] using the `FileKind` enum for English options
+      type FileKind = enum
+        file, directory, link, lfile, flink, ldirectory, dlink
+
+      func to(filetype: FileKind, T: type set[PathComponent]): T =
+        case filetype
+        of file: {pcFile}
+        of directory: {pcDir}
+        of link: {pcLinkToFile, pcLinkToDir}
+        of lfile, flink: {pcLinkToFile}
+        of ldirectory, dlink: {pcLinkToDir}
+      
       if a.val.len == 0:
         a.msg = "No value set for option \"$1$2\"\n" % [a.key, a.sep]
         raise newException(ElementError, "No value")
@@ -171,22 +179,28 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
       let old = a.sep; a.sep = ""
       for i, tok in toks:
 
-        var parsed, default: set[FileKind]
         a.val = tok
 
-        case a.val
-        of "l":
-          parsed.incl link
-        of "f":
-          parsed.incl {file, lfile}
-        of "d":
-          parsed.incl {directory, ldirectory}
-        elif not argParse(parsed, default, a):
-          result = {}; a.sep = old
-          raise newException(ElementError, "Bad element " & $i)
+        if a.val[0] == '.':
+          result.extensions.incl a.val
 
-        for t in parsed:
-          result.incl t.to(set[PathComponent])
+        elif a.val == "any":
+          result = FileTypes()
+
+        else:
+          var parsed, default: set[FileKind]
+          case a.val
+          of "l":
+            parsed.incl link
+          of "f":
+            parsed.incl {file, lfile}
+          of "d":
+            parsed.incl {directory, ldirectory}
+          elif not argParse(parsed, default, a):
+            result.extensions.incl '.' & a.val
+
+          for t in parsed:
+            result.kinds.incl t.to(set[PathComponent])
       a.sep = old #probably don't need to restore, but eh.
 
     if a.sep.len <= 1:                      # no sep|no op => append
@@ -195,7 +209,7 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
       return
 
     if a.val == "" and a.sep == ",=": # clear
-      dst = {}; return
+      dst = FileTypes(); return
 
     case a.sep
     of "+=": dst.incl argAggSplit(a, false)
@@ -212,15 +226,8 @@ proc argParse*(dst: var set[PathComponent], dfl: set[PathComponent], a: var Argc
   except:
     return false
 
-func argHelp*(dfl: set[PathComponent], a: var ArgcvtParams): seq[string]=
-  var typ = "filetype"; var df: string
-  var dflSeq: seq[string]
-  if dfl == {pcFile, pcDir, pcLinkToFile, pcLinkToDir}:
-    dflSeq = @["any"]
-  else:
-    for d in dfl: dflSeq.add($d)
-  argAggHelp(dflSeq, "set", typ, df)
-  result = @[ a.argKeys, typ, df ]
+func argHelp*(dfl: FileTypes, a: var ArgcvtParams): seq[string]=
+  result = @[a.argKeys, "filetypes", "any"]
 
 proc f*() =
   const nimbleFile = staticRead(currentSourcePath().parentDir.parentDir / "nimf.nimble")
@@ -236,7 +243,7 @@ proc f*() =
            short = {"exclude": 'x', "types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
            help = {"all": "Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.",
                    "exclude": "Add patterns to ignore.",
-                   "types": "Select which file kind(s) to match. File kinds include any|file|directory|link|lfile|ldir.",
+                   "types": "Select which file type(s) to match. File type may be any|file|directory|link or a file extension.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &

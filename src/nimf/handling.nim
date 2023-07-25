@@ -4,7 +4,7 @@
 
 ## Procedures used once a file has matched.
 
-import ./[common, find, color], std/[os, paths, options, tables], pkg/malebolgia
+import ./[common, find, color], std/[os, paths, options, sets, tables], pkg/malebolgia
 from   std/strutils import join
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
@@ -26,12 +26,17 @@ type
     allIndexes*: seq[seq[Natural]]
     placements*: seq[(Natural, Natural)]
 
+  FileTypes* = object
+    kinds*: set[PathComponent]
+    extensions*: HashSet[string]
+
   RunOptionAction* = enum
     plainPrint, coloredPrint, collect, exec
 
   RunOption* = object
     searchAll*: bool
     exclude*: seq[tuple[pattern: string, fullmatch: bool]]
+    types*: FileTypes
     maxDepth* = 0
     maxFound* = 0
     followSymlinks*: bool
@@ -48,19 +53,21 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int): T {.inline.} =
-  result = RunOption(action: action, followSymlinks: followSymlinks, searchAll: searchAll, maxDepth: maxDepth, maxFound: maxFound)
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int): T {.inline.} =
+  result = RunOption(action: action, followSymlinks: followSymlinks, searchAll: searchAll, types: types, maxDepth: maxDepth, maxFound: maxFound)
+  if result.types.kinds == {}:
+    result.types.kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
   for x in exclude:
     if x.len > 0: result.exclude.add (x, x.len > 1 and x.find(['/'], 1, x.high - 1).isSome)
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
   assert action == exec
-  result = RunOption.init(action, followSymlinks, searchAll, exclude, maxDepth, maxFound)
+  result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound)
   result.cmds = cmds
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
   assert action in {plainPrint, coloredPrint}
-  result = RunOption.init(action, followSymlinks, searchAll, exclude, maxDepth, maxFound)
+  result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound)
   result.null = null
   {.cast(uncheckedAssign).}:
     result.hyperlink = hyperlink
@@ -104,7 +111,7 @@ proc color*(found: Found, patterns: openArray[string]): string =
   let highlightColor =
     if likely ansiCode("01;31") notin [dirColor, fileColor]: ansiCode("01;31") # Bright red
     elif ansiCode("01;33") notin [dirColor, fileColor]: ansiCode("01;33") # Bright yellow
-    else: ansiCode("01;36") # Bright cyan (they have red/yellow as their other colors)
+    else: ansiCode("01;36") # Bright cyan (other colors are red and yellow)
 
   if patterns == @[""]:
     result = dirColor & path[0..parentSep]
