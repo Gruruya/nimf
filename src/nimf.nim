@@ -161,7 +161,7 @@ proc argParse*(dst: var FileTypes, dfl: FileTypes, a: var ArgcvtParams): bool =
     proc argAggSplit(a: var ArgcvtParams, split=true): FileTypes =
       ## Similar to `argAggSplit` but specialized for set[PathComponent] using the `FileKind` enum for English options
       type FileKind = enum
-        file, directory, link, lfile, flink, ldirectory, dlink
+        file, directory, link, lfile, ldirectory, flink, dlink
 
       func to(filetype: FileKind, T: type set[PathComponent]): T =
         case filetype
@@ -243,7 +243,7 @@ proc f*() =
            short = {"exclude": 'x', "types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
            help = {"all": "Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.",
                    "exclude": "Add patterns to ignore.",
-                   "types": "Select which file type(s) to match. File type may be any|file|directory|link or a file extension.",
+                   "types": "Select which file type(s) to match. File type may be any|{l}file|{l}directory|{f/d}link or a file extension.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
                               "Alternatively, end this argument with \"+\" to execute the command once with all results as arguments.\n" & 
                               "Example: f .nim -e \"$EDITOR\"+\n" &
