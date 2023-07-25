@@ -84,8 +84,8 @@ func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sens
 
   # Special handling for / and $ as start and end of line
   if pattern.len > 1:
-    if pattern[^1] == '$' and path.string[^1] != '$':
-      let ret = preceedsWith(if path.string[last] == '/': last - 1 else: last, 0, pattern.high - (if pattern.high >= 2 and pattern[^2] == '/': 2 else: 1))
+    if pattern[^1] == '$':
+      let ret = preceedsWith(if path.string[last] == '/': last - 1 else: last, 0, pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1))
       if ret.isSome: return ret
     if pattern[0] == '/' and path.string[0] != '/':
       let patStart = pattern.low + 1
