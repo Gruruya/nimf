@@ -83,22 +83,23 @@ func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sens
     else: path.string.preceedsWith(pattern, last, patStart, patEnd, cmp = cmpInsensitive)
 
   # Special handling for / and $ as start and end of line
-  if pattern[^1] == '$' and path.string[^1] != '$':
-    let ret = preceedsWith(if path.string[last] == '/': last - 1 else: last, 0, pattern.high - (if pattern[^2] == '/': 2 else: 1))
-    if ret.isSome: return ret
-  if pattern[0] == '/' and path.string[0] != '/':
-    let patStart = pattern.low + 1
-    if pattern[^1] == '$': # $pattern/, check exact match
-      var patEnd = pattern.high - 1
-      var last = last
-      if path.string[^1] == '/':
-        dec last
-        if pattern[patEnd] == '/': dec patEnd
-      if last == patEnd - patStart:
-        let ret = preceedsWith(last, patStart, patEnd)
-        if ret.isSome: return ret
-    let ret = preceedsWith(pattern.high - patStart, patStart, pattern.high)
-    if ret.isSome: return ret
+  if pattern.len > 1:
+    if pattern[^1] == '$' and path.string[^1] != '$':
+      let ret = preceedsWith(if path.string[last] == '/': last - 1 else: last, 0, pattern.high - (if pattern.high >= 2 and pattern[^2] == '/': 2 else: 1))
+      if ret.isSome: return ret
+    if pattern[0] == '/' and path.string[0] != '/':
+      let patStart = pattern.low + 1
+      if pattern[^1] == '$': # $pattern/, check exact match
+        var patEnd = pattern.high - 1
+        var last = last
+        if path.string[^1] == '/':
+          dec last
+          if pattern[patEnd] == '/': dec patEnd
+        if last == patEnd - patStart:
+          let ret = preceedsWith(last, patStart, patEnd)
+          if ret.isSome: return ret
+      let ret = preceedsWith(pattern.high - patStart, patStart, pattern.high)
+      if ret.isSome: return ret
 
   for i in countdown(last, start):
     let ret = preceedsWith(i)
