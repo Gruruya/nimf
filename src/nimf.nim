@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 ## The CLI interface for nimf
-import ./nimf/[find, findFiles, color, handling],
+import ./nimf/[find, color, handling, text],
        pkg/[cligen, cligen/argcvt],
        std/[paths, exitprocs, macros, sets]
 import std/os except getCurrentDir

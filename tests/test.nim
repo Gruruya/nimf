@@ -5,7 +5,7 @@
 #TODO: This module
 
 import pkg/balls
-import ../src/nimf, ../src/nimf/find
+import ../src/nimf, ../src/nimf/text
 
 suite "finding":
   block basic:

@@ -3,7 +3,7 @@
 
 version     = "0.4.6"
 author      = "Gruruya"
-description = "Text finder"
+description = "File finder"
 license     = "AGPL-3.0-only"
 
 srcDir = "src"

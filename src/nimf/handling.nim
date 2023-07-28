@@ -4,7 +4,7 @@
 
 ## Procedures used once a file has matched.
 
-import ./[common, find, color], std/[os, paths, options, sets, tables], pkg/malebolgia
+import ./[common, text, color], std/[os, paths, options, sets, tables], pkg/malebolgia
 from   std/strutils import join
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen

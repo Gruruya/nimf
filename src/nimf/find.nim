@@ -1,142 +1,366 @@
-# Text finding --- nimf
+# File path finding --- nimf
 # Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-## Finding primitives
+## Main logic for nimf.
+## Posix only currently as it uses stat.
+import ./[common, text, handling, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
+import std/os except getCurrentDir
+from   std/sequtils import anyIt
+export load
 
-import std/options
-export options
+proc `&`(p: Path; c: char): Path {.inline, borrow.}
+proc add(x: var Path; y: char) {.inline.} = x.string.add y
+proc high(p: Path): int {.inline, borrow.}
+proc len(p: Path): int {.inline, borrow.}
+proc hash(x: Path): Hash {.inline, borrow.}
 
-{.push inline, checks: off.}
+type
+  File = object
+    path*: string
+    case kind*: PathComponent
+    of pcFile:
+      stat*: Option[Stat]
+    of pcLinkToFile:
+      broken*: bool
+    else: discard
+  Locked[T] = object
+    value*: T
+    lock*: Lock
+  Findings = object
+    found*: Locked[seq[Found]]
+    dirs*: Locked[HashSet[Path]]
 
-func continuesWith*(text, substr: openArray[char]; start: Natural): bool =
-  ## Checks if `substr` is in `text` starting at `start`
-  for i in substr.low..substr.high:
-    if text[i + start] != substr[i]: return false
-  result = true
+proc toFound(file: File, path: Path, matches: seq[(int, int)]): Found =
+  result = Found(path: path, matches: matches, kind: file.kind)
+  case file.kind
+  of pcFile:
+    result.stat = file.stat
+  of pcLinkToFile:
+    result.broken = file.broken
+  else: discard
 
-func find*(text, pattern: openArray[char]; start = 0.Natural, last: Natural): Option[Natural] =
-  for i in start..last:
-    if text.continuesWith(pattern, i):
-      return some i
-  result = none Natural
+proc toFound(file: tuple[kind: PathComponent, path: string], path: Path, matches: seq[(int, int)]): Found =
+  Found(path: path, matches: matches, kind: file.kind)
 
-func find*(text, pattern: openArray[char]; start = 0.Natural): Option[Natural] =
-  find(text, pattern, start, text.len - pattern.len)
+proc init(T: typedesc[Findings]): T =
+  result.dirs.value = initHashset[Path]()
+  initLock(result.found.lock)
+  initLock(result.dirs.lock)
 
-func toLowerAscii*(c: char): char =
-  if c in {'A'..'Z'}:
-    char(uint8(c) xor 0b0010_0000'u8)
-  else: c
+template withLock(lock: Lock; body: untyped): untyped =
+  acquire(lock)
+  {.gcsafe.}:
+    try: body
+    finally: release(lock)
 
-func cmpInsensitive*(a, b: char): bool =
-  a.toLowerAscii == b.toLowerAscii
+proc addImpl(findings: var Findings; found: Found) {.inline.} =
+  withLock(findings.found.lock):
+    findings.found.value.add found
 
-func continuesWith*(text, substr: openArray[char]; start: Natural; cmp: proc): bool =
-  ## Checks if `substr` is in `text` starting at `start`, custom comparison procedure variant
-  for i in substr.low..substr.high:
-    if not cmp(text[i + start], substr[i]): return false
-  result = true
+proc seenOrInclImpl(findings: var Findings; dir: Path): bool {.inline.} =
+  withLock(findings.dirs.lock):
+    result = findings.dirs.value.containsOrIncl dir
 
-func findI*(text, pattern: openArray[char]; start = 0.Natural, last: Natural): Option[Natural] =
-  for i in start..last:
-    if text.continuesWith(pattern, i, cmpInsensitive):
-      return some i
-  result = none Natural
+template add(findings: var Findings; found: Found) = {.gcsafe.}: addImpl(findings, found)
+template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenOrInclImpl(findings, dir)
 
-func findI*(text, pattern: openArray[char], start = 0.Natural): Option[Natural] =
-  findI(text, pattern, start, text.len - pattern.len)
+var findings = Findings.init()
 
-func preceedsWith*(text, substr: openArray[char]; last: Natural): bool =
-  ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
-  for i in substr.low..substr.high:
-    if text[last - i] != substr[^(i + 1)]: return false
-  result = true
+func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): Option[(Natural, Natural)] {.inline.} =
+  ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`
+  for i in 0..subEnd - subStart:
+    if text[last - (subEnd - subStart - i)] != substr[i + subStart]: return
+  result = some (Natural(last - (subEnd - subStart)), last)
 
-func rfind*(text, pattern: openArray[char]; start, last: Natural): Option[Natural] =
+func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural; cmp: proc): Option[(Natural, Natural)] {.inline.} =
+  ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`, custom comparison procedure variant
+  for i in 0..subEnd - subStart:
+    if not cmp(text[last - (subEnd - subStart - i)], substr[i + subStart]): return
+  result = some (Natural(last - (subEnd - subStart)), last)
+
+func rfind(path: Path, pattern: openArray[char]; start, last: sink Natural; sensitive: bool): Option[(Natural, Natural)] {.inline.} =
+  template preceedsWith(last = last; patStart = pattern.low; patEnd = pattern.high): untyped =
+    if sensitive: path.string.preceedsWith(pattern, last, patStart, patEnd)
+    else: path.string.preceedsWith(pattern, last, patStart, patEnd, cmp = cmpInsensitive)
+
+  template returnSome[T](o: Option[T]): untyped =
+    let ret = o
+    if ret.isSome: return ret
+
+  # Special handling for / and $ as start and end of line
+  if likely pattern.len > 1:
+    if pattern[^1] == '$':
+      let last = if path.string[last] == '/': last - 1 else: last
+      let patEnd = pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1)
+      if last - patEnd >= 0:
+        returnSome preceedsWith(last, 0, patEnd)
+    if pattern[0] == '/' and path.string[0] != '/':
+      let patStart = pattern.low + 1
+      if pattern[^1] == '$': # $pattern/, check exact match
+        let last = if path.string[last] == '/': last - 1 else: last
+        let patEnd = pattern.high - (if pattern.len > 2 and pattern[^2] == '/': 2 else: 1)
+        if last == patEnd - patStart:
+          returnSome preceedsWith(last, patStart, patEnd)
+      returnSome preceedsWith(pattern.high - patStart, patStart, pattern.high)
+
   for i in countdown(last, start):
-    if text.preceedsWith(pattern, i):
-      return some i
-  result = none Natural
+    returnSome preceedsWith(i)
+  result = none (Natural, Natural)
 
-func rfind*(text, pattern: openArray[char]; start: Natural): Option[Natural] =
-  rfind(text, pattern, start, text.high)
-func rfind*(text, pattern: openArray[char]; last: Natural): Option[Natural] =
-  rfind(text, pattern, pattern.high, last)
-func rfind*(text, pattern: openArray[char]): Option[Natural] =
-  rfind(text, pattern, pattern.high, text.high)
+proc findPath*(path: Path; patterns: openArray[string]; sensitive: bool): seq[(int, int)] =
+  ## Variant of `find` which searches the filename for patterns following the last pattern with a directory separator
+  if patterns.len == 0: return @[]
+  result = newSeq[(int, int)](patterns.len)
 
-func preceedsWith*(text, substr: openArray[char]; last: Natural; cmp: proc): bool =
-  ## Checks if `substr` is in `text` ending at `last`, custom comparison procedure variant
-  for i in substr.low..substr.high:
-    if not cmp(text[last - i], substr[^(i + 1)]): return false
-  result = true
+  var filenameSep = -1
+  for i in countdown(patterns.high, patterns.low):
+    if '/' in patterns[i]:
+      filenameSep = i
+      break
+  let lastSep =
+    if path.len == 1: 0
+    else: path.string.rfind("/", last = path.high - 1).get(0)
 
-func rfindI*(text, pattern: openArray[char], start, last: Natural): Option[Natural] =
-  for i in countdown(last, start):
-    if text.preceedsWith(pattern, i, cmpInsensitive):
-      return some i
-  result = none Natural
-
-func rfindI*(text, pattern: openArray[char], start: Natural): Option[Natural] =
-  rfindI(text, pattern, start, text.high)
-func rfindI*(text, pattern: openArray[char], last: Natural): Option[Natural] =
-  rfindI(text, pattern, pattern.high, last)
-func rfindI*(text, pattern: openArray[char]): Option[Natural] =
-  rfindI(text, pattern, pattern.high, text.high)
-
-func containsAny*(string: openArray[char], chars: set[char]): bool {.inline.} =
-  for c in string:
-    if c in chars: return true
-  result = false
-
-func containsAny*(strings: openArray[string], chars: set[char]): bool {.inline.} =
-  for string in strings:
-    if string.containsAny(chars): return true
-  result = false
-
-func find*(text: openArray[char], patterns: openArray[string], start: sink Natural = 0, last: sink int = -1): seq[Natural] =
-  ## Patterns must match in order
-  result = newSeqOfCap[Natural](patterns.len)
-  let sensitive = patterns.containsAny({'A'..'Z'})
-  for pattern in patterns:
-    if pattern.len == 0:
-      result.add 0
-      continue
-    if start > text.high: return @[]
-
-    if last == -1: last = text.len - pattern.len
-    let where = if sensitive: text.find(pattern, start, last)
-                        else: text.findI(pattern, start, last)
-
-    if where.isNone: return @[]
-    result.add where.unsafeGet
-    start = where.unsafeGet + pattern.len
-
-func findAll*(text, pattern: openArray[char]): seq[Natural] =
-  ## Find all matches in any order
-  if unlikely pattern.len == 0: return @[]
-  var i = text.low
-  while i <= text.high and pattern.len + i <= text.len:
-    if text.continuesWith(pattern, i):
-      result.add i
-      inc(i, pattern.len)
+  var last = path.high
+  for i in countdown(patterns.high, patterns.low):
+    if last < 0: return @[]
+    if patterns[i].len == 0:
+      result[i] = (0, 0)
     else:
-      inc(i)
+      template start: untyped = (if i > filenameSep: lastSep + patterns[i].high else: patterns[i].high)
+      let found = rfind(path, patterns[i], start, last, sensitive)
+      if found.isNone: return @[]
+      result[i] = found.unsafeGet
+      last = result[i][0] - 1
 
-func findAll*(text: openArray[char], patterns: openArray[string]): seq[seq[Natural]] =
-  ## Find all matches in any order for all patterns in a single pass
-  result = newSeq[seq[Natural]](patterns.len)
-  for i in text.low..text.high:
-    for j, pattern in patterns:
-      if pattern.len + i <= text.len and
-         (result[j].len == 0 or result[j][^1] + pattern.len <= i) and
-         text.continuesWith(pattern, i):
-           result[j].add i
+func pathMatches(path: Path; pattern: openArray[char]): bool {.inline.} =
+  rfind(path, pattern, pattern.high, path.high, true).isSome
 
-func endsWith*(text, suffix: openArray[char]): bool {.inline.} =
-  suffix.high <= text.high and text.preceedsWith(suffix, text.high)
+template pathMatches(path: string; pattern: openArray[char]): bool =
+  pathMatches(Path(path), pattern)
 
-# Workaround for `system.find`
-template find*(text: openArray[char], pattern: string): Option[Natural] = find(text, pattern, 0)
-template find*(text: string, patterns: openArray[string]): seq[Natural] = find(text, patterns, 0)
+iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
+  # `walkDir` which yields an object also containing what was read from `Stat`
+  var d = opendir(dir)
+  if d == nil:
+    if checkDir:
+      raiseOSError(osLastError(), dir)
+  else:
+    defer: discard closedir(d)
+    while true:
+      var x = readdir(d)
+      if x == nil: break
+      var result = File(kind: pcFile)
+      result.path = $cast[cstring](addr x.d_name)
+      if result.path notin [".", ".."]:
+        let path = dir / result.path
+        if not relative:
+          result.path = path
+
+        template getSymlinkFileKind(path: string) =
+          var s: Stat
+          assert(path != "")
+          if stat(path.cstring, s) == 0'i32:
+            if S_ISDIR(s.st_mode):
+              result.kind = pcLinkToDir
+            elif S_ISREG(s.st_mode):
+              (result.kind, result.broken) = (pcLinkToFile, false)
+            else: (result.kind, result.broken) = (pcLinkToFile, true)
+          else: (result.kind, result.broken) = (pcLinkToFile, true)
+
+        template resolveSymlink() =
+          getSymlinkFileKind(path)
+
+        template kSetGeneric() = # pure Posix component `k` resolution
+          if lstat(path.cstring, result.stat.get) < 0'i32: continue  # don't yield
+          elif S_ISDIR(result.stat.unsafeGet.st_mode):
+            result.kind = pcDir
+          elif S_ISLNK(result.stat.unsafeGet.st_mode):
+            resolveSymlink()
+
+        {.cast(uncheckedAssign).}: # Assigning `result.kind`
+          when defined(linux) or defined(macosx) or
+               defined(bsd) or defined(genode) or defined(nintendoswitch):
+            case x.d_type
+            of DT_DIR: result.kind = pcDir
+            of DT_LNK:
+              resolveSymlink()
+            of DT_UNKNOWN:
+              kSetGeneric()
+            else: # DT_REG or special "files" like FIFOs
+              discard
+          else:   # assuming that field `d_type` is not present
+            kSetGeneric()
+
+        yield result
+
+var printQueue = newStringOfCap(8192)
+var printLock: Lock
+var numFailed = 0 # To print often even if there's a lot of filtering but few matches
+var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
+var numFound*: Atomic[int]
+var numMatches*: int
+
+{.push inline.}
+
+func wrapHyperlink(path: Path, hyperlinkPrefix: string, encodedCwd: string, display = path.string): string =
+  result = hyperlinkPrefix
+  if not path.isAbsolute:
+    result.add encodedCwd
+  result.add encodeHyperlink(path.string)
+  result.add "\e\\"
+  result.add display
+  when false: result.add "\e]8;;\e\\" # Hyperlinks are closed on exit
+
+proc print(path: Path; behavior: RunOption; display = path.string) =
+  template line: string =
+    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
+     else: display) & (if behavior.null: '\0' else: '\n')
+  {.gcsafe.}:
+    if numPrinted < 8192:
+      stdout.write line; stdout.flushFile()
+      inc numPrinted
+    else:
+      acquire(printLock)
+      if printQueue.len + line.len > 8192:
+        let output = move(printQueue)
+        release(printLock)
+        stdout.write output & line
+        stdout.flushFile()
+        numFailed = 0
+      else:
+        printQueue.add line
+        release(printLock)
+
+proc notFoundPrint() =
+  {.gcsafe.}:
+    if printQueue.len > 0:
+      inc numFailed
+      if numFailed > 16384:
+        withLock(printLock):
+          stdout.write printQueue
+          printQueue.setLen 0
+        stdout.flushFile()
+        numFailed = 0
+
+template incFound: untyped =
+  if behavior.maxFound != 0:
+    if numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound:
+      return
+  else: inc numMatches
+
+template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
+  incFound()
+  case behavior.action
+  of plainPrint:
+    print(path, behavior)
+  of coloredPrint: ({.gcsafe.}:
+    print(path, behavior, color(found, patterns)))
+  of collect:
+    findings.add(found)
+  of exec:
+    run(m, behavior.cmds, found)
+
+{.pop inline.}
+
+proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; sensitive: bool; behavior: RunOption; depth: Positive) {.gcsafe.} =
+  if behavior.maxFound != 0:
+    if numFound.load(moRelaxed) >= behavior.maxFound:
+      return
+
+  template loop: untyped =
+    template relPath(path: string): Path =
+      (if isAbsolute(path) or dir.string in [".", "./"]: Path(path)
+       else: dir / Path(path))
+
+    template format(path: string): Path =
+      if descendent.kind == pcLinkToDir: relPath(path) & '/'
+      else: relPath(path)
+
+    template wasFound(path: Path; found: seq[(int, int)]) =
+      m.runFound(behavior, path, descendent.toFound(path, matches = found), patterns)
+
+    template matchesExt(path: Path): bool =
+      behavior.types.extensions.len == 0 or anyIt(behavior.types.extensions, path.string.endsWith(it))
+
+    template match(path: Path) =
+      if m.cancelled: return
+      if matchesExt(path) and (
+        let found = path.findPath(patterns, sensitive)
+        found.len > 0):
+          wasFound(path, found)
+      elif behavior.action in {plainPrint, coloredPrint}:
+        notFoundPrint()
+
+    if behavior.exclude.len != 0:
+      (var found = false; for x in behavior.exclude:
+         if x.fullmatch:
+           if pathMatches(absolutePath(Path descendent.path, cwd), x.pattern): (found = true; break)
+         elif pathMatches(filename(descendent.path), x.pattern): (found = true; break)
+       if found: continue)
+
+    if descendent.kind == pcDir:
+      if not behavior.searchAll and ignoreDir(descendent.path): continue
+      let path = relPath(descendent.path) & '/'
+      if behavior.followSymlinks:
+        let absPath = absolutePath(path, cwd)
+        if findings.seenOrIncl absPath: continue
+      if behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth:
+        m.spawn findDirRec(m, path, cwd, patterns, sensitive, behavior, depth + 1)
+      if pcDir in behavior.types.kinds:
+        match(path)
+
+    elif behavior.followSymlinks and descendent.kind == pcLinkToDir:
+      if not behavior.searchAll and ignoreDir(descendent.path): continue
+      let path = relPath(descendent.path)
+      var resolved = try: dir / Path(expandSymlink(path.string)) except: continue
+      if resolved == Path("/"): continue # Special case this
+      if resolved.string[^1] != '/': resolved &= '/'
+      let absResolved = absolutePath(resolved, cwd)
+      if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
+        m.spawn findDirRec(m, resolved, cwd, patterns, sensitive, behavior, depth + 1)
+
+      if pcLinkToDir in behavior.types.kinds:
+        match(path & '/')
+
+    elif descendent.kind in behavior.types.kinds:
+      let path = format(descendent.path)
+      match(path)
+
+  if behavior.action == coloredPrint:
+    for descendent in dir.string.walkDirStat(relative = not isAbsolute(dir)):
+      loop()
+  else:
+    for descendent in dir.string.walkDir(relative = not isAbsolute(dir)):
+      loop()
+
+var findMaster* = createMaster()
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunOption): seq[Found] =
+  let sensitive = patterns.containsAny({'A'..'Z'})
+  let cwd = getCurrentDir()
+  findMaster.awaitAll:
+    for i, path in paths:
+      let info = getFileInfo(path.string)
+      if info.kind == pcDir:
+        findMaster.spawn findDirRec(getHandle findMaster, path, cwd, patterns, sensitive, behavior, 1)
+
+      elif info.kind in behavior.types.kinds:
+        let found = path.findPath(patterns, sensitive)
+        if found.len > 0:
+          incFound()
+          template getFound: Found =
+            if behavior.action == coloredPrint and info.kind == pcLinkToFile:
+                var s: Stat; let broken = stat(cstring path.string, s) < 0'i32
+                Found(path: path, kind: pcLinkToFile, matches: found, broken: broken)
+            else: Found(path: path, kind: info.kind, matches: found)
+          getHandle(findMaster).runFound(behavior, path, getFound(), patterns)
+        elif behavior.action in {plainPrint, coloredPrint}:
+          notFoundPrint()
+
+  if not findMaster.cancelled:
+    case behavior.action
+    of plainPrint, coloredPrint:
+      if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
+    of collect: result &= findings.found.value
+    else: discard
