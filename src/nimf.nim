@@ -126,6 +126,9 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = FileTypes(); exec
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(exec, cmds)
 
+  if numMatches == 0:
+    quit 101
+
 #[ Special argument parsing ]#
 func argParse*(dst: var Flag, dfl: Flag, a: var ArgcvtParams): bool =
   ## For `--flag=auto`, `contra` is equivalent to `--flag` without an argument (negating)

@@ -199,6 +199,7 @@ var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 var numFound: Atomic[int]
+var numMatches*: Natural
 
 {.push inline.}
 
@@ -244,6 +245,7 @@ proc notFoundPrint() =
 
 template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
   if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
+  inc numMatches
   case behavior.action
   of plainPrint:
     print(path, behavior)
