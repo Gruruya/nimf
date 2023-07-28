@@ -117,9 +117,8 @@ proc color*(found: Found, patterns: openArray[string]): string =
     else: ansiCode("01;36") # Bright cyan (other colors are red and yellow)
 
   if patterns == @[""]:
-    result = (dirColor & path[0..parentSep] &
-              fileColor & path[parentSep + 1..^1] &
-              ansiResetCode)
+    if parentSep != -1: result = dirColor & path[0..parentSep]
+    result.add fileColor & path[parentSep + 1..^1] & ansiResetCode
   else:
     var start = 0
     for i in 0..found.matches.high:
@@ -254,3 +253,11 @@ proc run*(m: MasterHandle; cmds: seq[Command], found: Found) =
     if not anyPlaceholders:
           m.spawn execShell cmd.line & ' ' & (needs(toPaths); replacements[toPaths])
     else: m.spawn execShell cmd.line.replaceAt(cmd.placements, replacements)
+
+when isMainModule:
+  lscolors = parseLSColorsEnv()
+  let plain = Found(path: Path "handling.nim", matches: @[(0, 0)])
+  echo color(plain, @[""])
+
+  let andl = Found(path: Path "handling.nim", matches: @[(1, 4)])
+  echo color(andl, @["andl"])
