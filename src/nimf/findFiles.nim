@@ -200,6 +200,7 @@ var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 var numFound*: Atomic[int]
+var numMatches*: int
 
 {.push inline.}
 
@@ -247,7 +248,7 @@ template incFound: untyped =
   if behavior.maxFound != 0:
     if numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound:
       return
-  else: discard numFound.fetchAdd(1, moRelaxed)
+  else: inc numMatches
 
 template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
   incFound()

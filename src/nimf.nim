@@ -126,7 +126,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(exec, cmds)
 
-  if numFound.load == 0:
+  if (if limit > 0: numFound.load == 0 else: numMatches == 0):
     quit 101
 
 #[ Special argument parsing ]#
