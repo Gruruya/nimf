@@ -7,6 +7,7 @@
 import ./[common, find, handling, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
 import std/os except getCurrentDir
 from   std/sequtils import anyIt
+export load
 
 proc `&`(p: Path; c: char): Path {.inline, borrow.}
 proc add(x: var Path; y: char) {.inline.} = x.string.add y
@@ -198,8 +199,7 @@ var printQueue = newStringOfCap(8192)
 var printLock: Lock
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
-var numFound: Atomic[int]
-var numMatches*: Natural
+var numFound*: Atomic[int]
 
 {.push inline.}
 
@@ -244,8 +244,10 @@ proc notFoundPrint() =
         numFailed = 0
 
 template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
-  if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: return
-  inc numMatches
+  if behavior.maxFound != 0:
+    if numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound:
+      return
+  else: discard numFound.fetchAdd(1, moRelaxed)
   case behavior.action
   of plainPrint:
     print(path, behavior)
@@ -259,7 +261,9 @@ template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found
 {.pop inline.}
 
 proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; sensitive: bool; behavior: RunOption; depth: Positive) {.gcsafe.} =
-  if behavior.maxFound != 0 and numFound.load(moRelaxed) >= behavior.maxFound: return
+  if behavior.maxFound != 0:
+    if numFound.load(moRelaxed) >= behavior.maxFound:
+      return
 
   template loop: untyped =
     template relPath(path: string): Path =
@@ -340,7 +344,9 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: sink
       elif info.kind in behavior.types.kinds:
         let found = path.findPath(patterns, sensitive)
         if found.len > 0:
-          if behavior.maxFound != 0 and numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
+          if behavior.maxFound != 0:
+            if numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
+          else: discard numFound.fetchAdd(1, moRelaxed)
           template getFound: Found =
             if behavior.action == coloredPrint and info.kind == pcLinkToFile:
                 var s: Stat; let broken = stat(cstring path.string, s) < 0'i32

@@ -56,7 +56,7 @@ template ctrlC(body: untyped): proc() {.noconv.} =
     stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
     quit(128 + 2)
 
-proc cliFind*(all = false; exclude = newSeq[string](); types = FileTypes(); execute = newSeq[string](); max_depth = 0; limit=0; follow_symlinks = false; null = false; color = Flag.auto; hyperlink = Flag.false; input: seq[string]): int =
+proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=newSeq[string](); max_depth=0; limit=0; follow_symlinks=false; null=false; color=Flag.auto; hyperlink=Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -126,7 +126,7 @@ proc cliFind*(all = false; exclude = newSeq[string](); types = FileTypes(); exec
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(exec, cmds)
 
-  if numMatches == 0:
+  if numFound.load == 0:
     quit 101
 
 #[ Special argument parsing ]#
