@@ -108,6 +108,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
       setControlCHook(ctrlC do: stdout.resetAttributes())
 
     if displayColor:
+      stdout.resetAttributes()
       exitprocs.addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
       lscolors = parseLSColorsEnv()
       discard traverse(coloredPrint, null, hyperlink)
