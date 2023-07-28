@@ -243,11 +243,14 @@ proc notFoundPrint() =
         stdout.flushFile()
         numFailed = 0
 
-template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
+template incFound: untyped =
   if behavior.maxFound != 0:
     if numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound:
       return
   else: discard numFound.fetchAdd(1, moRelaxed)
+
+template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found, patterns: openArray[string]) =
+  incFound()
   case behavior.action
   of plainPrint:
     print(path, behavior)
@@ -344,9 +347,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: sink
       elif info.kind in behavior.types.kinds:
         let found = path.findPath(patterns, sensitive)
         if found.len > 0:
-          if behavior.maxFound != 0:
-            if numFound.fetchAdd(1, moRelaxed) >= behavior.maxFound: continue
-          else: discard numFound.fetchAdd(1, moRelaxed)
+          incFound()
           template getFound: Found =
             if behavior.action == coloredPrint and info.kind == pcLinkToFile:
                 var s: Stat; let broken = stat(cstring path.string, s) < 0'i32

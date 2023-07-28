@@ -8,7 +8,7 @@ license     = "AGPL-3.0-only"
 
 srcDir = "src"
 skipDirs = @["tests"]
-installExt = @["nim"]
+installExt = @["nim", "csv"]
 namedBin["nimf"] = "f"
 
 # Dependencies
