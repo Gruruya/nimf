@@ -117,8 +117,9 @@ proc color*(found: Found, patterns: openArray[string]): string =
     else: ansiCode("01;36") # Bright cyan (other colors are red and yellow)
 
   if patterns == @[""]:
-    result = dirColor & path[0..parentSep]
-    result.add fileColor, path[parentSep + 1..^1]
+    result = (dirColor & path[0..parentSep] &
+              fileColor & path[parentSep + 1..^1] &
+              ansiResetCode)
   else:
     var start = 0
     for i in 0..found.matches.high:
@@ -142,6 +143,8 @@ proc color*(found: Found, patterns: openArray[string]): string =
       else:
         result.add dirColor, path[start .. parentSep]
         result.add fileColor, path[parentSep + 1 .. path.high]
+
+    result.add ansiResetCode
 
 template mapEnumeratedIt[T](collection: openArray[T], op: untyped): seq =
   type OutType = typeof((block:
