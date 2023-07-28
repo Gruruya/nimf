@@ -336,9 +336,36 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
       loop()
 
 var findMaster* = createMaster()
+
+{.hint[DuplicateModuleImport]: off.}:
+  from pkg/malebolgia {.all.} import globalStopToken
+{.hint[DuplicateModuleImport]: on.}
+
+proc stopSearch() =
+  {.gcsafe.}:
+    findMaster.cancel()
+
+proc stopFind*() =
+  globalStopToken.store(true)
+  findMaster.cancel()
+
 proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunOption): seq[Found] =
   let sensitive = patterns.containsAny({'A'..'Z'})
   let cwd = getCurrentDir()
+
+  var searchDone {.threadvar.}: bool
+  var kThread: Thread[TimeInterval]
+  if behavior.timeLimit != 0.milliseconds:
+    searchDone = false
+    proc limitSearch(t: TimeInterval) {.thread, nimcall.} =
+      var msLimit = t.milliseconds + t.seconds * 1000
+      while true:
+        if msLimit <= 0: stopSearch(); break
+        elif ({.gcsafe.}: searchDone): break
+        sleep(1)
+        msLimit -= 1
+    createThread(kThread, limitSearch, behavior.timeLimit)
+
   findMaster.awaitAll:
     for i, path in paths:
       let info = getFileInfo(path.string)
@@ -358,7 +385,11 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunO
         elif behavior.action in {plainPrint, coloredPrint}:
           notFoundPrint()
 
-  if not findMaster.cancelled:
+  if behavior.timeLimit != 0.milliseconds:
+    searchDone = true
+    joinThread(kThread)
+
+  if not globalStopToken.load(moRelaxed):
     case behavior.action
     of plainPrint, coloredPrint:
       if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()

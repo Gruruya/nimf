@@ -12,8 +12,6 @@ from   std/strutils import startsWith, toLowerAscii
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 
-#TODO: Remove weird / begin/end handling and add -t/--type which is like all of find -options, except if the type isn't a recognized keyword (or starts with a .), it's treated as an extension.
-
 type
   Flag {.pure.} = enum
     ## `bool` but with `auto` and `contra`
@@ -46,17 +44,14 @@ func substitute[T](x: var seq[T], y: seq[T], i: Natural) =
     x[i + y.len .. x.high] = x[i + 1 .. x.high + 1 - y.len]
     x[i ..< i + y.len] = y
 
-from pkg/malebolgia {.all.} import globalStopToken, cancel
-from std/atomics import store
 template ctrlC(body: untyped): proc() {.noconv.} =
   proc() {.noconv.} =
-    globalStopToken.store(true)
-    findMaster.cancel()
+    stopFind()
     body
     stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
     quit(128 + 2)
 
-proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=newSeq[string](); max_depth=0; limit=0; follow_symlinks=false; null=false; color=Flag.auto; hyperlink=Flag.false; input: seq[string]): int =
+proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=newSeq[string](); max_depth=0; limit=(found: 0, time: 0.milliseconds); follow_symlinks=false; null=false; color=Flag.auto; hyperlink=Flag.false; input: seq[string]): int =
   var patterns = newSeq[string]()
   var paths = newSeq[Path]()
   var input = input
@@ -97,7 +92,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
   if paths.len == 0: paths = @[Path(".")]
 
   macro traverse(andDo: RunOptionAction, args: varargs[typed]): untyped =
-    var behavior = quote: RunOption.init(`andDo`, follow_symlinks, all, exclude, types, max_depth, limit)
+    var behavior = quote: RunOption.init(`andDo`, follow_symlinks, all, exclude, types, max_depth, limit.found, limit.time)
     for a in args: behavior.add a
     quote: traverseFind(paths, patterns, `behavior`)
 
@@ -126,7 +121,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(exec, cmds)
 
-  if (if limit > 0: numFound.load == 0 else: numMatches == 0):
+  if (if limit.found > 0: numFound.load == 0 else: numMatches == 0):
     quit 101
 
 #[ Special argument parsing ]#
@@ -155,6 +150,23 @@ proc argHelp*(dfl: Flag; a: var ArgcvtParams): seq[string] =
   if a.parSh.len > 0:
     a.shortNoVal.incl(a.parSh[0]) # flag can elide option arguments.
   a.longNoVal.add(move(a.parNm))  # So, add to *NoVal.
+
+proc argHelp*(dfl: tuple[found: int, time: TimeInterval]; a: var ArgcvtParams): seq[string] =
+  @[ a.argKeys, "int/ms/s", "0" ]
+
+proc argParse*(dst: var tuple[found: int, time: TimeInterval], dfl: tuple[found: int, time: TimeInterval], a: var ArgcvtParams): bool =
+  if a.val.endsWith("ms"):
+    a.val.setLen(a.val.len - 2)
+    var ms: int
+    result = argParse(ms, dfl.found, a)
+    dst.time = ms.milliseconds
+  elif a.val.endsWith("s"):
+    a.val.setLen(a.val.len - 1)
+    var s: int
+    result = argParse(s, dfl.found, a)
+    dst.time = s.seconds
+  else:
+    result = argParse(dst.found, dfl.found, a)
 
 proc argParse*(dst: var FileTypes, dfl: FileTypes, a: var ArgcvtParams): bool =
   ## Parse `set[PathComponent]` as a `set[FileKind]`
@@ -259,7 +271,7 @@ proc f*() =
                               "Example: f .jpg -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
                    "max-depth": "Set a maximum of how deep in the directory tree to search.",
-                   "limit": "Limit the number of results.",
+                   "limit": "Limit the search to a number of results, alternatively end this argument with `ms` or `s` to limit the search based on time.",
                    "follow-symlinks": "Enable traversing symlinks.",
                    "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
                    "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",

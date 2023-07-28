@@ -4,12 +4,12 @@
 
 ## Procedures used once a file has matched.
 
-import ./[common, text, color], std/[os, paths, options, sets, tables], pkg/malebolgia
+import ./[common, text, color], std/[os, paths, options, sets, tables, times], pkg/malebolgia
 from   std/strutils import join
 from   std/sequtils import mapIt, anyIt
 from   std/typetraits import enumLen
 from   std/nativesockets import getHostname
-export LSColors, parseLSColorsEnv
+export LSColors, parseLSColorsEnv, times
 
 var lscolors*: LSColors
 
@@ -39,6 +39,7 @@ type
     types*: FileTypes
     maxDepth* = 0
     maxFound* = 0
+    timeLimit* = 0.milliseconds
     followSymlinks*: bool
 
     case action*: RunOptionAction
@@ -53,21 +54,21 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int): T {.inline.} =
-  result = RunOption(action: action, followSymlinks: followSymlinks, searchAll: searchAll, types: types, maxDepth: maxDepth, maxFound: maxFound)
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; timeLimit: TimeInterval): T {.inline.} =
+  result = RunOption(action: action, followSymlinks: followSymlinks, searchAll: searchAll, types: types, maxDepth: maxDepth, maxFound: maxFound, timeLimit: timeLimit)
   if result.types.kinds == {}:
     result.types.kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
   for x in exclude:
     if x.len > 0: result.exclude.add (x, x.len > 1 and x.find(['/'], 1, x.high - 1).isSome)
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; cmds: seq[Command]): T {.inline.} =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; timeLimit: TimeInterval; cmds: seq[Command]): T {.inline.} =
   assert action == exec
-  result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound)
+  result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound, timeLimit)
   result.cmds = cmds
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; null: bool; hyperlink: bool): T =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; timeLimit: TimeInterval; null: bool; hyperlink: bool): T =
   assert action in {plainPrint, coloredPrint}
-  result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound)
+  result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound, timeLimit)
   result.null = null
   {.cast(uncheckedAssign).}:
     result.hyperlink = hyperlink
