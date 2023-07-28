@@ -336,7 +336,7 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
       loop()
 
 var findMaster* = createMaster()
-proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: sink RunOption): seq[Found] =
+proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunOption): seq[Found] =
   let sensitive = patterns.containsAny({'A'..'Z'})
   let cwd = getCurrentDir()
   findMaster.awaitAll:
