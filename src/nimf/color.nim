@@ -3,11 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 ## Color support for the CLI, parsed from `LS_COLORS`
-import ./common, pkg/lscolors/entrytypes,
+import ./[common, text], pkg/lscolors/entrytypes,
        std/[posix, os, options, tables]
 import pkg/lscolors except parseLsColors, LsColors
 from   std/strutils import split
-export entrytypes
 
 type
   LSColors* = object
@@ -123,3 +122,58 @@ proc styleForDirEntry*(lsc: LSColors, entry: Entry): string =
 
 proc styleForPath*(lsc: LSColors, found: Found): string {.inline.} =
   styleForDirEntry(lsc, Entry(path: found.path.string, typ: found.pathEntryType()))
+
+template add(x: var string, y: varargs[string]) =
+  for j in y: system.add(x, j)
+
+
+var colorConf*: LSColors
+
+proc color*(found: Found, patterns: openArray[string]): string =
+  template path: untyped = found.path.string
+  let parentSep =
+    if path.len == 1: -1
+    else: path.rfind("/", last = path.high - 1).getIt(it.int, -1)
+
+  let dirColor = colorConf.types.getOrDefault(etDirectory, ansiResetCode)
+  let fileColor =
+    if found.kind == pcDir: dirColor # optimization
+    else: colorConf.styleForPath(found)
+  let highlightColor =
+    if likely ansiCode("01;31") notin [dirColor, fileColor]: ansiCode("01;31") # Bright red
+    elif ansiCode("01;33") notin [dirColor, fileColor]: ansiCode("01;33") # Bright yellow
+    else: ansiCode("01;36") # Bright cyan (other colors are red and yellow)
+
+  if patterns == @[""]:
+    if parentSep != -1: result = dirColor & path[0..parentSep]
+    result.add fileColor & path[parentSep + 1..^1] & ansiResetCode
+  else:
+    var start = 0
+    for i in 0..found.matches.high:
+      let matchStart = found.matches[i][0]
+      let matchEnd = found.matches[i][1]
+
+      if parentSep < start:
+        result.add fileColor, path[start ..< matchStart]
+      elif dirColor == fileColor or parentSep >= matchStart:
+        result.add dirColor, path[start ..< matchStart]
+      else:
+        result.add dirColor, path[start .. parentSep]
+        result.add fileColor, path[parentSep + 1 ..< matchStart]
+
+      result.add highlightColor, path[matchStart..matchEnd]
+      start = matchEnd + 1
+
+    if start != path.len:
+      if start > parentSep or dirColor == fileColor:
+        result.add fileColor, path[start..path.high]
+      else:
+        result.add dirColor, path[start .. parentSep]
+        result.add fileColor, path[parentSep + 1 .. path.high]
+
+    result.add ansiResetCode
+
+when isMainModule:
+  colorConf = parseLSColorsEnv()
+  let lo = Found(path: Path "color.nim", matches: @[(2, 3)])
+  echo color(lo, @["lo"])

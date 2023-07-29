@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import std/[os, paths, posix, options], ./text
+export Path
 
 type
   Found* = object

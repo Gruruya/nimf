@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 ## The CLI interface for nimf
-import ./nimf/[find, color, handling, text],
+import ./nimf/[find, handling, color, text],
        pkg/[cligen, cligen/argcvt],
        std/[paths, exitprocs, macros, sets]
 import std/os except getCurrentDir
@@ -110,8 +110,8 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
 
     if displayColor:
       stdout.resetAttributes()
-      addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
-      lscolors = parseLSColorsEnv()
+      exitprocs.addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
+      colorConf = parseLSColorsEnv()
       discard traverse(coloredPrint, null, hyperlink)
     else:
       discard traverse(plainPrint, null, hyperlink)

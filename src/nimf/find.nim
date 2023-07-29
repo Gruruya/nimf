@@ -4,7 +4,7 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-import ./[common, text, handling, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
+import ./[common, text, handling, color, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
 import std/os except getCurrentDir
 from   std/sequtils import anyIt
 export load
@@ -397,5 +397,5 @@ proc traverseFind*(paths: openArray[Path]; patterns: openArray[string]; behavior
     else: discard
 
 when isMainModule:
-  lscolors = parseLSColorsEnv()
+  colorConf = parseLSColorsEnv()
   discard traverseFind([Path "."], ["nd"], RunOption.init(plainPrint))
