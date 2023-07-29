@@ -54,19 +54,19 @@ type
       cmds*: seq[Command]
     else: discard
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; timeLimit: TimeInterval): T {.inline.} =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks = false; searchAll = false; exclude = newSeq[string](); types = FileTypes(); maxDepth = 0; maxFound = 0; timeLimit = 0.milliseconds): T {.inline.} =
   result = RunOption(action: action, followSymlinks: followSymlinks, searchAll: searchAll, types: types, maxDepth: maxDepth, maxFound: maxFound, timeLimit: timeLimit)
   if result.types.kinds == {}:
     result.types.kinds = {pcFile, pcDir, pcLinkToFile, pcLinkToDir}
   for x in exclude:
     if x.len > 0: result.exclude.add (x, x.len > 1 and x.find(['/'], 1, x.high - 1).isSome)
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; timeLimit: TimeInterval; cmds: seq[Command]): T {.inline.} =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks = false; searchAll = false; exclude = newSeq[string](); types = FileTypes(); maxDepth = 0; maxFound = 0; timeLimit = 0.milliseconds; cmds: seq[Command]): T {.inline.} =
   assert action == exec
   result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound, timeLimit)
   result.cmds = cmds
 
-proc init*(T: type RunOption; action: RunOptionAction; followSymlinks: bool; searchAll: bool; exclude: seq[string]; types: FileTypes; maxDepth: int; maxFound: int; timeLimit: TimeInterval; null: bool; hyperlink: bool): T =
+proc init*(T: type RunOption; action: RunOptionAction; followSymlinks = false; searchAll = false; exclude = newSeq[string](); types = FileTypes(); maxDepth = 0; maxFound = 0; timeLimit = 0.milliseconds; null, hyperlink: bool): T =
   assert action in {plainPrint, coloredPrint}
   result = RunOption.init(action, followSymlinks, searchAll, exclude, types, maxDepth, maxFound, timeLimit)
   result.null = null

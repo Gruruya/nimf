@@ -349,7 +349,7 @@ proc stopFind*() =
   globalStopToken.store(true)
   findMaster.cancel()
 
-proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunOption): seq[Found] =
+proc traverseFind*(paths: openArray[Path]; patterns: openArray[string]; behavior: RunOption): seq[Found] =
   let sensitive = patterns.containsAny({'A'..'Z'})
   let cwd = getCurrentDir()
 
@@ -395,3 +395,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunO
       if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
     of collect: result &= findings.found.value
     else: discard
+
+when isMainModule:
+  lscolors = parseLSColorsEnv()
+  discard traverseFind([Path "."], ["nd"], RunOption.init(plainPrint))
