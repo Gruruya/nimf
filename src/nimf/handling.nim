@@ -121,6 +121,7 @@ proc color*(found: Found, patterns: openArray[string]): string =
     result.add fileColor & path[parentSep + 1..^1] & ansiResetCode
   else:
     var start = 0
+    # TODO: Unroll first loop and check for ansiresetcode
     for i in 0..found.matches.high:
       let matchStart = found.matches[i][0]
       let matchEnd = found.matches[i][1]

@@ -381,7 +381,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: seq[string]; behavior: RunO
                 var s: Stat; let broken = stat(cstring path.string, s) < 0'i32
                 Found(path: path, kind: pcLinkToFile, matches: found, broken: broken)
             else: Found(path: path, kind: info.kind, matches: found)
-          getHandle(findMaster).runFound(behavior, path, getFound(), patterns)
+          runFound(getHandle(findMaster), behavior, path, getFound(), patterns)
         elif behavior.action in {plainPrint, coloredPrint}:
           notFoundPrint()
 

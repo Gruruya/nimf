@@ -85,6 +85,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
     for i in input.low..input.high:
       let arg = input[i]
       if arg != "/" and (dirExists(arg) or fileExists(arg) and (arg.startsWith("./") or absolutePath(Path(arg)).parentDir != getCurrentDir())) and not paths.alreadyAdded(arg):
+        # TODO: Avoid duplicate paths
         paths.add Path(arg)
       else:
         patterns.add arg
@@ -103,13 +104,13 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
 
     if hyperlink:
       setControlCHook(ctrlC do: stdout.write "\e]8;;\e\\"; stdout.resetAttributes())
-      exitprocs.addExitProc(proc = stderr.write "\e]8;;\e\\"; stdout.write "\e]8;;\e\\")
+      addExitProc(proc = stderr.write "\e]8;;\e\\"; stdout.write "\e]8;;\e\\")
     elif displayColor:
       setControlCHook(ctrlC do: stdout.resetAttributes())
 
     if displayColor:
       stdout.resetAttributes()
-      exitprocs.addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
+      addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
       lscolors = parseLSColorsEnv()
       discard traverse(coloredPrint, null, hyperlink)
     else:
@@ -122,7 +123,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
       let cmds = execute.mapIt(Command.init(it))
       discard traverse(exec, cmds)
 
-  if (if limit.found > 0: numFound.load == 0 else: numMatches == 0):
+  if (if limit.found > 0: numFound.load else: numMatches) == 0:
     quit 101
 
 #[ Special argument parsing ]#
