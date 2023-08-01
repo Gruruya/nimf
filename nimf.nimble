@@ -12,7 +12,7 @@ installExt = @["nim", "csv"]
 namedBin["nimf"] = "f"
 
 # Dependencies
-requires "nim >= 1.9.3"
+requires "nim >= 2.0.0"
 requires "malebolgia"
 requires "cligen >= 1.6.6 & < 2.0.0"
 requires "lscolors#head"
