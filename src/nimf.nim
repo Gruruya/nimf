@@ -254,11 +254,13 @@ proc f*() =
   dispatch(cliFind,
            cmdName = "f",
            usage = (try: getAppFilename().lastPathPart except: "f") & " $args\n\n" &
-                    "Entered `input` may be a pattern OR a path to search.\n" &
-                    "The pattern will only match with the filename unless you include a `/`.\n" &
+                    "Arguments:\n" &
+                    "  Entered `input` may be a pattern OR a path to search.\n\n" &
+                    "  The pattern will only match with the filename unless you include a \"/\".\n" &
+                    "  \"/\" and \"$$\" also match the start and end of a path.\n" &
                     "\nOptions:\n$options",
            short = {"exclude": 'x', "types": 't', "max_depth": 'd', "follow_symlinks": 'L', "null": '0'},
-           help = {"all": "Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.",
+           help = {"all": "Search all directories, including those ignored by default/your \".config/nimf/ignore.csv\" file.",
                    "exclude": "Add patterns to ignore.",
                    "types": "Select which file type(s) to match. File type may be any|{l}file|{l}directory|{f/d}link or a file extension.",
                    "execute": "Execute a command for each matching search result in parallel.\n" &
@@ -270,13 +272,13 @@ proc f*() =
                               "\"{//}\": parent directory\n" &
                               "\"{.}\":  path without file extension\n" &
                               "\"{/.}\": basename without file extension\n" &
-                              "Example: f .jpg -e 'convert {} {.}.png'\n" &
+                              "Example: f .jpg$ -e 'convert {} {.}.png'\n" &
                               "If no placeholder is present, an implicit \" {}\" at the end is assumed.",
                    "max-depth": "Set a maximum of how deep in the directory tree to search.",
-                   "limit": "Limit the search to a number of results, alternatively end this argument with `ms` or `s` to limit the search based on time.",
+                   "limit": "Limit the search to a number of results, alternatively end this argument with \"ms\" or \"s\" to limit the search based on time.",
                    "follow-symlinks": "Enable traversing symlinks.",
-                   "color": "Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.",
-                   "null": "Separate search results and split stdin with null characters `\\\\0` instead of newlines `\\\\n`.",
+                   "color": "Enable or disable colored printing. Default is based on the \"NO_COLOR\" environment variable.",
+                   "null": "Separate search results (stdout) and split stdin with null characters \"\\\\0\" instead of newlines \"\\\\n\".",
                    "hyperlink": "Enable clickable hyperlinks in supported terminals."})
 
 when isMainModule:

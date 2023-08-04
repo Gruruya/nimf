@@ -17,14 +17,17 @@ Usage
 Usage:
   f [optional-params] [input: string...]
 
-Entered `input` may be a pattern OR a path to search.
-The pattern will only match with the filename unless you include a `/`.
+Arguments:
+  Entered `input` may be a pattern OR a path to search.
+
+  The pattern will only match with the filename unless you include a "/".
+  "/" and "$" also match the start and end of a path.
 
 Options:
   -h, --help                               print this cligen-erated help
   --help-syntax                            advanced: prepend,plurals,..
   --version              bool       false  print version
-  -a, --all              bool       false  Search all directories, including those ignored by default/your `.config/nimf/ignore.csv` file.
+  -a, --all              bool       false  Search all directories, including those ignored by default/your ".config/nimf/ignore.csv" file.
   -x=, --exclude=        strings    {}     Add patterns to ignore.
   -t=, --types=          filetypes  any    Select which file type(s) to match. File type may be any|{l}file|{l}directory|{f/d}link or a file extension.
   -e=, --execute=        strings    {}     Execute a command for each matching search result in parallel.
@@ -36,13 +39,13 @@ Options:
                                            "{//}": parent directory
                                            "{.}":  path without file extension
                                            "{/.}": basename without file extension
-                                           Example: f .jpg -e 'convert {} {.}.png'
+                                           Example: f .jpg$ -e 'convert {} {.}.png'
                                            If no placeholder is present, an implicit " {}" at the end is assumed.
   -d=, --max-depth=      int        0      Set a maximum of how deep in the directory tree to search.
-  -l=, --limit=          int/ms/s   0      Limit the search to a number of results, alternatively end this argument with `ms` or `s` to limit the search based on time.
+  -l=, --limit=          int/ms/s   0      Limit the search to a number of results, alternatively end this argument with "ms" or "s" to limit the search based on time.
   -L, --follow-symlinks  bool       false  Enable traversing symlinks.
-  -0, --null             bool       false  Separate search results and split stdin with null characters `\0` instead of newlines `\n`.
-  -c, --color            flag       auto   Enable or disable colored printing. Default is based on the `NO_COLOR` environment variable.
+  -0, --null             bool       false  Separate search results (stdout) and split stdin with null characters "\0" instead of newlines "\n".
+  -c, --color            flag       auto   Enable or disable colored printing. Default is based on the "NO_COLOR" environment variable.
   --hyperlink            flag       false  Enable clickable hyperlinks in supported terminals.
 ```
 
