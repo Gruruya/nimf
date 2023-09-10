@@ -4,7 +4,7 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-import ./[common, text, handling, color, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/malebolgia
+import ./[common, text, handling, color, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/[malebolgia, stack_strings]
 import std/os except getCurrentDir
 from   std/sequtils import anyIt
 export load
@@ -66,6 +66,7 @@ template add(findings: var Findings; found: Found) = {.gcsafe.}: addImpl(finding
 template seenOrIncl(findings: var Findings; dir: Path): bool = {.gcsafe.}: seenOrInclImpl(findings, dir)
 
 var findings = Findings.init()
+
 
 func preceedsWith(text, substr: openArray[char]; last, subStart, subEnd: Natural): Option[(Natural, Natural)] {.inline.} =
   ## Checks if `substr[subStart..subEnd]` is in `text` ending at `last`
@@ -140,6 +141,7 @@ func pathMatches(path: Path; pattern: openArray[char]): bool {.inline.} =
 template pathMatches(path: string; pattern: openArray[char]): bool =
   pathMatches(Path(path), pattern)
 
+
 iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.tags: [ReadDirEffect].} =
   # `walkDir` which yields an object also containing what was read from `Stat`
   var d = opendir(dir)
@@ -195,8 +197,9 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
 
         yield result
 
-var printQueue = newStringOfCap(8192)
-var printLock: Lock
+
+var printBuffer = stackStringOfCap(8192)
+var printLock: Lock; initLock(printLock)
 var numFailed = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 var numFound*: Atomic[int]
@@ -214,33 +217,37 @@ func wrapHyperlink(path: Path, hyperlinkPrefix: string, encodedCwd: string, disp
   when false: result.add "\e]8;;\e\\" # Hyperlinks are closed on exit
 
 proc print(path: Path; behavior: RunOption; display = path.string) =
-  template line: string =
+  template getLine: string =
     (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
      else: display) & (if behavior.null: '\0' else: '\n')
   {.gcsafe.}:
     if numPrinted < 8192:
-      stdout.write line; stdout.flushFile()
+      stdout.write getLine(); stdout.flushFile()
       inc numPrinted
     else:
+      let line = getLine()
       acquire(printLock)
-      if printQueue.len + line.len > 8192:
-        let output = move(printQueue)
+      if printBuffer.len + line.len > 8192:
+        var output = when declared(newStringUninit): newStringUninit(printBuffer.len + line.len) else: newString(printBuffer.len + line.len)
+        moveMem(addr output[0], addr printBuffer.data[0], printBuffer.len)
+        printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
         release(printLock)
-        stdout.write output & line
+        output[^line.len..^1] = ensureMove(line)
+        stdout.write output
         stdout.flushFile()
         numFailed = 0
       else:
-        printQueue.add line
+        printBuffer.unsafeAdd ensureMove(line)
         release(printLock)
 
 proc notFoundPrint() =
   {.gcsafe.}:
-    if printQueue.len > 0:
+    if printBuffer.len > 0:
       inc numFailed
       if numFailed > 16384:
         withLock(printLock):
-          stdout.write printQueue
-          printQueue.setLen 0
+          stdout.write printBuffer
+          printBuffer.setLen 0
         stdout.flushFile()
         numFailed = 0
 
@@ -262,8 +269,8 @@ template runFound(m: MasterHandle; behavior: RunOption; path: Path, found: Found
   of exec:
     run(m, behavior.cmds, found)
 
-{.pop inline.}
 
+{.pop inline.}
 proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; sensitive: bool; behavior: RunOption; depth: Positive) {.gcsafe.} =
   if behavior.maxFound != 0:
     if numFound.load(moRelaxed) >= behavior.maxFound:
@@ -337,8 +344,8 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
 
 var findMaster* = createMaster()
 
-{.hint[DuplicateModuleImport]: off.}:
-  from pkg/malebolgia {.all.} import globalStopToken
+{.hint[DuplicateModuleImport]: off.}
+from pkg/malebolgia {.all.} import globalStopToken
 {.hint[DuplicateModuleImport]: on.}
 
 proc stopSearch() =
@@ -392,7 +399,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: openArray[string]; behavior
   if not globalStopToken.load(moRelaxed):
     case behavior.action
     of plainPrint, coloredPrint:
-      if printQueue.len > 0: stdout.write printQueue; stdout.flushFile()
+      if printBuffer.len > 0: stdout.write printBuffer.toString; stdout.flushFile()
     of collect: result &= findings.found.value
     else: discard
 
