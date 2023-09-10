@@ -245,9 +245,12 @@ proc notFoundPrint() =
     if printBuffer.len > 0:
       inc numFailed
       if numFailed > 16384:
+        var output: string
         withLock(printLock):
-          stdout.write printBuffer.toString
-          printBuffer.setLen 0
+          output = when declared(newStringUninit): newStringUninit(printBuffer.len) else: newString(printBuffer.len)
+          moveMem(addr output[0], addr printBuffer.data[0], printBuffer.len)
+          printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
+        stdout.write output
         stdout.flushFile()
         numFailed = 0
 
