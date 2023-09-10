@@ -225,7 +225,7 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
       stdout.write getLine(); stdout.flushFile()
       inc numPrinted
     else:
-      let line = getLine()
+      var line = getLine()
       acquire(printLock)
       if printBuffer.len + line.len > 8192:
         var output = when declared(newStringUninit): newStringUninit(printBuffer.len + line.len) else: newString(printBuffer.len + line.len)
