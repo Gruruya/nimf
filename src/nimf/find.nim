@@ -246,7 +246,7 @@ proc notFoundPrint() =
       inc numFailed
       if numFailed > 16384:
         withLock(printLock):
-          stdout.write printBuffer
+          stdout.write printBuffer.toString
           printBuffer.setLen 0
         stdout.flushFile()
         numFailed = 0
