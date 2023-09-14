@@ -16,7 +16,7 @@ requires "nim >= 2.0.0"
 requires "malebolgia"
 requires "cligen >= 1.6.6 & < 2.0.0"
 requires "lscolors#head"
-requires "stack_strings"
+requires "stack_strings >= 1.1.1"
 
 taskRequires "test", "https://github.com/disruptek/balls.git >= 3.0.0"
 
