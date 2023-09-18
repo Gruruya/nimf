@@ -229,7 +229,7 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
       var line = getLine()
       acquire(printLock)
       if printBuffer.len + line.len > 8192:
-        # Some terminal emulators are very slow, to improve performance when they are, we minimize writes and keep those writes outside of a lock.
+        # Writing to the terminal can be slow, to improve performance make a copy and write it outside of the lock.
         let output = printBuffer
         printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
         release(printLock)
