@@ -230,12 +230,11 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
       acquire(printLock)
       if printBuffer.len + line.len > 8192:
         # Some terminal emulators are very slow, to improve performance when they are, we minimize writes and keep those writes outside of a lock.
-        var output = when declared(newStringUninit): newStringUninit(printBuffer.len + line.len) else: newString(printBuffer.len + line.len)
-        moveMem(addr output[0], addr printBuffer.data[0], printBuffer.len)
+        let output = printBuffer
         printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
         release(printLock)
-        output[^line.len..^1] = ensureMove(line)
-        stdout.write output
+        discard stdout.writeChars(output.data, 0, output.len)
+        stdout.write line
         stdout.flushFile()
         numWaited = 0
       else:
@@ -248,12 +247,11 @@ proc notFoundPrint() =
     if printBuffer.len > 0:
       inc numWaited
       if unlikely numWaited > 16384:
-        var output: string
+        var output: typeof(printBuffer)
         withLock(printLock):
-          output = when declared(newStringUninit): newStringUninit(printBuffer.len) else: newString(printBuffer.len)
-          moveMem(addr output[0], addr printBuffer.data[0], printBuffer.len)
+          output = printBuffer
           printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
-        stdout.write output
+        discard stdout.writeChars(output.data, 0, output.len)
         stdout.flushFile()
         numWaited = 0
 
@@ -405,7 +403,7 @@ proc traverseFind*(paths: openArray[Path]; patterns: openArray[string]; behavior
   if not globalStopToken.load(moRelaxed):
     case behavior.action
     of plainPrint, coloredPrint:
-      if printBuffer.len > 0: stdout.write printBuffer.toString; stdout.flushFile()
+      if printBuffer.len > 0: discard stdout.writeChars(printBuffer.data, 0, printBuffer.len); stdout.flushFile()
     of collect: result &= findings.found.value
     else: discard
 
