@@ -200,7 +200,7 @@ iterator walkDirStat*(dir: string; relative = false, checkDir = false): File {.t
 
 var printBuffer = stackStringOfCap(8192)
 var printLock: Lock; initLock(printLock)
-var numFailed = 0 # To print often even if there's a lot of filtering but few matches
+var numWaited = 0 # To print often even if there's a lot of filtering but few matches
 var numPrinted = 0 # If there's a low number of matches printing directly can be faster than batching
 var numFound*: Atomic[int]
 var numMatches*: int
@@ -222,12 +222,14 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
      else: display) & (if behavior.null: '\0' else: '\n')
   {.gcsafe.}:
     if numPrinted < 8192:
+      # Initial results are directly printed, write performance doesn't matter if there aren't many lines to print.
       stdout.write getLine(); stdout.flushFile()
       inc numPrinted
     else:
       var line = getLine()
       acquire(printLock)
       if printBuffer.len + line.len > 8192:
+        # Some terminal emulators are very slow, to improve performance when they are, we minimize writes and keep those writes outside of a lock.
         var output = when declared(newStringUninit): newStringUninit(printBuffer.len + line.len) else: newString(printBuffer.len + line.len)
         moveMem(addr output[0], addr printBuffer.data[0], printBuffer.len)
         printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
@@ -235,16 +237,17 @@ proc print(path: Path; behavior: RunOption; display = path.string) =
         output[^line.len..^1] = ensureMove(line)
         stdout.write output
         stdout.flushFile()
-        numFailed = 0
+        numWaited = 0
       else:
         printBuffer.unsafeAdd ensureMove(line)
         release(printLock)
 
 proc notFoundPrint() =
+  ## Prints matches found by a search that's not filling the print buffer fast enough.
   {.gcsafe.}:
     if printBuffer.len > 0:
-      inc numFailed
-      if numFailed > 16384:
+      inc numWaited
+      if unlikely numWaited > 16384:
         var output: string
         withLock(printLock):
           output = when declared(newStringUninit): newStringUninit(printBuffer.len) else: newString(printBuffer.len)
@@ -252,7 +255,7 @@ proc notFoundPrint() =
           printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
         stdout.write output
         stdout.flushFile()
-        numFailed = 0
+        numWaited = 0
 
 template incFound: untyped =
   if behavior.maxFound != 0:
