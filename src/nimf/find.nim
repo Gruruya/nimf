@@ -217,16 +217,15 @@ func wrapHyperlink(path: Path, hyperlinkPrefix: string, encodedCwd: string, disp
   when false: result.add "\e]8;;\e\\" # Hyperlinks are closed on exit
 
 proc print(path: Path; behavior: RunOption; display = path.string) =
-  template getLine: string =
-    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
-     else: display) & (if behavior.null: '\0' else: '\n')
   {.gcsafe.}:
+    var line =
+      (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
+       else: display) & (if behavior.null: '\0' else: '\n')
     if numPrinted < 8192:
       # Initial results are directly printed, write performance doesn't matter if there aren't many lines to print.
-      stdout.write getLine(); stdout.flushFile()
+      stdout.write line; stdout.flushFile()
       inc numPrinted
     else:
-      var line = getLine()
       acquire(printLock)
       if printBuffer.len + line.len > 8192:
         # Writing to the terminal can be slow, to improve performance make a copy and write it outside of the lock.
