@@ -216,43 +216,41 @@ func wrapHyperlink(path: Path, hyperlinkPrefix: string, encodedCwd: string, disp
   result.add display
   when false: result.add "\e]8;;\e\\" # Hyperlinks are closed on exit
 
-proc print(path: Path; behavior: RunOption; display = path.string) =
-  {.gcsafe.}:
-    var line =
-      (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
-       else: display) & (if behavior.null: '\0' else: '\n')
-    if numPrinted < 8192:
-      # Initial results are directly printed, write performance doesn't matter if there aren't many lines to print.
-      stdout.write line; stdout.flushFile()
-      inc numPrinted
+proc print(path: Path; behavior: RunOption; display = path.string) = {.gcsafe.}:
+  var line =
+    (if behavior.hyperlink: wrapHyperlink(path, behavior.hyperlinkPrefix, behavior.hyperlinkCwd, display)
+     else: display) & (if behavior.null: '\0' else: '\n')
+  if numPrinted < 8192:
+    # Initial results are directly printed, write performance doesn't matter if there aren't many lines to print.
+    stdout.write line; stdout.flushFile()
+    inc numPrinted
+  else:
+    acquire(printLock)
+    if printBuffer.len + line.len > 8192:
+      # Writing to the terminal can be slow, to improve performance make a copy and write it outside of the lock.
+      let output = printBuffer
+      printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
+      release(printLock)
+      discard stdout.writeChars(output.data, 0, output.len)
+      stdout.write line
+      stdout.flushFile()
+      numWaited = 0
     else:
-      acquire(printLock)
-      if printBuffer.len + line.len > 8192:
-        # Writing to the terminal can be slow, to improve performance make a copy and write it outside of the lock.
-        let output = printBuffer
-        printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
-        release(printLock)
-        discard stdout.writeChars(output.data, 0, output.len)
-        stdout.write line
-        stdout.flushFile()
-        numWaited = 0
-      else:
-        printBuffer.unsafeAdd ensureMove(line)
-        release(printLock)
+      printBuffer.unsafeAdd ensureMove(line)
+      release(printLock)
 
-proc notFoundPrint() =
+proc notFoundPrint() = {.gcsafe.}:
   ## Prints matches found by a search that's not filling the print buffer fast enough.
-  {.gcsafe.}:
-    if printBuffer.len > 0:
-      inc numWaited
-      if unlikely numWaited > 16384:
-        var output: typeof(printBuffer)
-        withLock(printLock):
-          output = printBuffer
-          printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
-        discard stdout.writeChars(output.data, 0, output.len)
-        stdout.flushFile()
-        numWaited = 0
+  if printBuffer.len > 0:
+    inc numWaited
+    if unlikely numWaited > 16384:
+      var output: typeof(printBuffer)
+      withLock(printLock):
+        output = printBuffer
+        printBuffer.unsafeSetLen(0, writeZerosOnTruncate = false)
+      discard stdout.writeChars(output.data, 0, output.len)
+      stdout.flushFile()
+      numWaited = 0
 
 template incFound: untyped =
   if behavior.maxFound != 0:
