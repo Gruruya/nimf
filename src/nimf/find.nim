@@ -4,7 +4,7 @@
 
 ## Main logic for nimf.
 ## Posix only currently as it uses stat.
-import ./[common, text, handling, color, ignore], std/[paths, locks, atomics, posix, sets, hashes], pkg/[malebolgia, stack_strings]
+import ./[common, text, handling, color, ignore], std/[paths, symlinks, locks, atomics, posix, sets, hashes], pkg/[malebolgia, stack_strings]
 import std/os except getCurrentDir
 from   std/sequtils import anyIt
 export load
@@ -322,11 +322,14 @@ proc findDirRec(m: MasterHandle; dir, cwd: Path; patterns: openArray[string]; se
     elif behavior.followSymlinks and descendent.kind == pcLinkToDir:
       if not behavior.searchAll and ignoreDir(descendent.path): continue
       let path = relPath(descendent.path)
-      var resolved = try: dir / Path(expandSymlink(path.string)) except: continue
+      var resolved = try: expandSymlink(path) except: continue
+      let absLink = isAbsolute(resolved)
+      if not absLink: resolved = dir / resolved
       if resolved == Path("/"): continue # Special case this
       if resolved.string[^1] != '/': resolved &= '/'
-      let absResolved = absolutePath(resolved, cwd)
-      if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and not findings.seenOrIncl absResolved:
+
+      if (behavior.maxDepth == 0 or depth + 1 <= behavior.maxDepth) and
+         not(findings.seenOrIncl(if absLink: resolved else: cwd / resolved)):
         m.spawn findDirRec(m, resolved, cwd, patterns, sensitive, behavior, depth + 1)
 
       if pcLinkToDir in behavior.types.kinds:
