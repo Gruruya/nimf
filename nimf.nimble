@@ -1,7 +1,7 @@
 # Copyright © 2023 Gruruya <gruruya.chi4c@slmails.com>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-version     = "0.5.2"
+version     = "0.5.3"
 author      = "Gruruya"
 description = "File finder"
 license     = "AGPL-3.0-only"
