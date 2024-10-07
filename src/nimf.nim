@@ -48,7 +48,7 @@ template ctrlC(body: untyped): proc() {.noconv.} =
   proc() {.noconv.} =
     stopFind()
     body
-    stdout.write "SIGINT: Interrupted by Ctrl-C.\n"
+    stderr.write "SIGINT: Interrupted by Ctrl-C.\n"
     quit(128 + 2)
 
 proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=newSeq[string](); max_depth=0; limit=(found: 0, time: 0.milliseconds); follow_symlinks=false; null=false; color=Flag.auto; hyperlink=Flag.false; input: seq[string]): int =
