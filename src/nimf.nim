@@ -110,7 +110,7 @@ proc cliFind*(all=false; exclude=newSeq[string](); types=FileTypes(); execute=ne
 
     if displayColor:
       stdout.resetAttributes()
-      exitprocs.addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
+      # exitprocs.addExitProc(proc = stderr.resetAttributes(); stdout.resetAttributes())
       colorConf = parseLSColorsEnv()
       discard traverse(coloredPrint, null, hyperlink)
     else:
